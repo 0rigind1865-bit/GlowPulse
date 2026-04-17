@@ -1,0 +1,22 @@
+# 環境變數（含 API 金鑰，絕對不能進版本控制）
+.env
+
+# Claude Code 本機權限設定（每台機器不同，不需要同步）
+.claude/settings.local.json
+
+# 自動產生的週報（內容隨時間變化，不需要版本控制）
+docs/reports/
+
+# Node.js 依賴
+node_modules/
+
+# TypeScript 編譯產出
+dist/
+*.js.map
+
+# macOS 系統檔
+.DS_Store
+
+# 編輯器設定
+.vscode/
+.idea/

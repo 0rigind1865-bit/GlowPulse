@@ -1,0 +1,28 @@
+{
+  "name": "glowpulse",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "post": "tsx src/agent.ts --post",
+    "image-post": "tsx src/agent.ts --image-post",
+    "analyze": "tsx src/agent.ts --analyze",
+    "all": "tsx src/agent.ts --all",
+    "report": "tsx src/agent.ts --report",
+    "agent": "tsx src/agent.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
+    "dotenv": "^17.4.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.2"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "tsx": "^4.21.0"
+  }
+}
