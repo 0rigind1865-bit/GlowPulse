@@ -19,4 +19,10 @@ export const SCREENSHOTS: Screenshot[] = [
         featureName: '服務項目管理',
         description: '此SaaS行動應用介面用於編輯服務項目。畫面顯示服務名稱「法式手繪美甲」、品牌圖片及刪除按鈕。下方可輸入服務時間（1小時）、總價（3000）與訂金（500），並有上下調整時間的選擇器。使用者可點擊「新增項目」或「儲存服務項目」按鈕進行操作。',
     },
+    {
+        filename: '2.png',
+        githubUrl: 'https://raw.githubusercontent.com/0rigind1865-bit/GlowPulse/main/assets/screenshots/2.png',
+        featureName: '服務項目管理',
+        description: '此SaaS行動應用介面用於編輯服務項目。畫面顯示服務名稱「法式手繪美甲」、品牌圖片及刪除按鈕。下方可輸入服務時間（1小時）、總價（3000）與訂金（500），並有上下調整時間的選擇器。使用者可點擊「新增項目」或「儲存服務項目」按鈕進行操作。',
+    },
 ];
