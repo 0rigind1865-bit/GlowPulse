@@ -99,9 +99,19 @@ async function analyzeWithAI(
         return await callClaude(system, prompt, 3000);
     } catch (err) {
         const msg = err instanceof Error ? err.message : '';
-        if (msg.includes('credit balance') || msg.includes('billing')) {
-            console.warn('⚠️  Claude 餘額不足，退回使用 Hugging Face（繁體中文品質可能略差，自動更新可能無法執行）');
-            console.warn('   充值：https://console.anthropic.com/settings/billing');
+        const shouldFallback =
+            msg.includes('credit balance') ||
+            msg.includes('billing') ||
+            msg.includes('ANTHROPIC_API_KEY') ||
+            msg.includes('authentication') ||
+            msg.includes('401');
+        if (shouldFallback) {
+            console.warn('⚠️  Claude 無法使用，退回使用 Hugging Face（繁體中文品質可能略差，自動更新可能無法執行）');
+            if (msg.includes('ANTHROPIC_API_KEY')) {
+                console.warn('   原因：未設定 ANTHROPIC_API_KEY，請至 https://console.anthropic.com/ 取得');
+            } else {
+                console.warn('   充值：https://console.anthropic.com/settings/billing');
+            }
             const hfPrompt = `請全程使用繁體中文回應，嚴禁使用簡體中文。\n\n${prompt}`;
             return callChatCompletion(
                 'Qwen/Qwen2.5-7B-Instruct',

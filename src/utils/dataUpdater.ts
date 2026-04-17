@@ -83,7 +83,10 @@ export function updateStylesTs(styles: Array<{ name: string; instruction: string
 
     const header = content.slice(0, arrayStart);
     const entries = styles.map(s => {
-        const escaped = s.instruction.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const escaped = s.instruction
+            .replace(/\\/g, '\\\\')   // 反斜線先跳脫
+            .replace(/'/g, "\\'")     // 單引號跳脫
+            .replace(/\r?\n/g, ' ');  // 換行轉空格（單引號字串不允許換行）
         return `    {\n        name: '${s.name}',\n        instruction: '${escaped}',\n    }`;
     }).join(',\n');
 

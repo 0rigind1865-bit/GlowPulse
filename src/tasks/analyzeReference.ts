@@ -207,9 +207,20 @@ async function analyzeWithAI(posts: ReferencePost[]): Promise<string> {
         return await callClaude(system, prompt, 3000);
     } catch (err) {
         const msg = err instanceof Error ? err.message : '';
-        if (msg.includes('credit balance') || msg.includes('billing')) {
-            console.warn('⚠️  Claude 餘額不足，退回使用 Hugging Face（分析品質可能略差）');
-            console.warn('   充值：https://console.anthropic.com/settings/billing');
+        // 三種情況都退回 HF：餘額不足、API Key 未設定、Key 無效
+        const shouldFallback =
+            msg.includes('credit balance') ||
+            msg.includes('billing') ||
+            msg.includes('ANTHROPIC_API_KEY') ||
+            msg.includes('authentication') ||
+            msg.includes('401');
+        if (shouldFallback) {
+            console.warn('⚠️  Claude 無法使用，退回 Hugging Face（分析品質可能略差）');
+            if (msg.includes('ANTHROPIC_API_KEY')) {
+                console.warn('   原因：未設定 ANTHROPIC_API_KEY，請至 https://console.anthropic.com/ 取得');
+            } else {
+                console.warn('   充值：https://console.anthropic.com/settings/billing');
+            }
             return callChatCompletion(
                 'Qwen/Qwen2.5-7B-Instruct',
                 [{ role: 'user', content: `請全程使用繁體中文回應，嚴禁使用簡體中文。\n\n${prompt}` }],
