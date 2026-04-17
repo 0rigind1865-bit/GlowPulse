@@ -53,8 +53,8 @@ export function updateBrandTs(principles: string[]): void {
     const filePath = join(DATA_DIR, 'brand.ts');
     const content = readFileSync(filePath, 'utf-8');
 
-    const markerIdx = content.indexOf('【寫作原則】');
-    if (markerIdx === -1) throw new Error('brand.ts 中找不到【寫作原則】標記');
+    const markerIdx = content.indexOf('【從優質貼文學到的技巧】');
+    if (markerIdx === -1) throw new Error('brand.ts 中找不到【從優質貼文學到的技巧】標記');
 
     const beforeMarker = content.slice(0, markerIdx);
     const afterMarker = content.slice(markerIdx);
@@ -64,7 +64,7 @@ export function updateBrandTs(principles: string[]): void {
     if (closingIdx === -1) throw new Error('brand.ts 格式異常，找不到結尾反引號');
 
     const closing = afterMarker.slice(closingIdx);
-    const newSection = '【寫作原則】\n' + principles.map(p => `- ${p}`).join('\n');
+    const newSection = '【從優質貼文學到的技巧】\n' + principles.map(p => `- ${p}`).join('\n');
 
     writeFileSync(filePath, beforeMarker + newSection + closing, 'utf-8');
 }
