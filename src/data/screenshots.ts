@@ -12,10 +12,9 @@ export type Screenshot = {
 // https://raw.githubusercontent.com/使用者名稱/GlowPulse/main/assets/screenshots/檔名
 
 export const SCREENSHOTS: Screenshot[] = [
-    // 截圖放好後，依下方格式新增，例如：
-    // {
-    //     filename: 'booking-flow.png',
-    //     githubUrl: 'https://raw.githubusercontent.com/YOUR_USERNAME/GlowPulse/main/assets/screenshots/booking-flow.png',
-    //     featureName: '24小時線上預約',
-    // },
+    {
+        filename: 'service-setup.png',
+        githubUrl: 'https://raw.githubusercontent.com/0rigind1865-bit/GlowPulse/main/assets/screenshots/service-setup.png',
+        featureName: '質感預約頁面',
+    },
 ];
