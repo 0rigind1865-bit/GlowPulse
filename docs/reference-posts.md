@@ -53,7 +53,25 @@ URL: https://www.threads.com/@cartonking.tw/post/DWLj4FBmGCG
 
 ### 其他（跨類型 / 值得參考的寫法）
 
+#### 1
+URL: https://www.threads.com/@0rigin.d.1865/post/DSaAbxGgRyJ
+文字：
+最近看到很多美業朋友開始用 Vibe Coding，自己做專屬的預約網站，其實蠻有趣的 👀
+以前我也幫朋友規劃過一套給美甲／美容用的預約系統，
+是用 Google 日曆當核心 + LINE 官方帳號 做通知與互動，
+本質上就是一個「不用架伺服器、用 Google 帳號就能跑」的服務。
+現在在做零點考勤的過程中，突然想到：
+👉 如果把這套預約系統 用一樣的架構做成開源，大家會有興趣嗎？
+
+#### 2
+URL: https://www.threads.com/@zuin.studio/post/DXLmtAhieID
+文字：
+創業後發現有好多東西想印刷！
+名片、商品小卡、品牌貼紙、包裝封口貼
+每個都覺得很需要( ੭˙ᗜ˙)੭
+如果只能先做一個你們會選擇哪個呢？
 ---
+
 
 ## 新增格式
 

@@ -7,6 +7,7 @@ import { runAutoPost } from './tasks/autoPost.js';
 import { analyzeAndReply } from './tasks/analyzeReply.js';
 import { runWeeklyReport } from './tasks/weeklyReport.js';
 import { runImagePost } from './tasks/imagePost.js';
+import { runAnalyzeReference } from './tasks/analyzeReference.js';
 
 // 從 CLI 參數解析執行模式
 // 範例：ts-node --esm src/agent.ts --post
@@ -96,6 +97,20 @@ async function main(): Promise<void> {
             break;
         }
 
+        case '--analyze-reference': {
+            // 解析參考貼文庫，AI 提取寫作模式，自動更新 brand.ts / styles.ts
+            const result = await runAnalyzeReference();
+            if (!result.success) {
+                console.error('\n❌ 分析失敗：', result.error);
+                process.exit(1);
+            }
+            console.log(`\n🎉 參考貼文分析完成！共分析 ${result.postsAnalyzed} 篇貼文`);
+            if (result.updatedFiles.length > 0) {
+                console.log(`   已更新：${result.updatedFiles.join('、')}`);
+            }
+            break;
+        }
+
         default:
             console.log(`
 GlowPulse Agent — GlowMoment 社群自動化工具
@@ -105,16 +120,19 @@ GlowPulse Agent — GlowMoment 社群自動化工具
   npm run image-post                   讀取截圖，AI 生成描述與文案後發布圖片貼文
   npm run analyze "貼文內容"            分析貼文並產出回覆建議
   npm run all                          執行完整每日任務（發文 + 分析）
+  npm run learn                        分析 reference-posts.md，AI 提取寫作模式並更新 data 層
   npm run report                       產生本週發文成效報告 + AI 改進建議
 
 模式說明：
-  --post         依今日日期選定功能與風格，AI 生成貼文後發布到 Threads
-  --image-post   依今日日期選定截圖，AI 分析截圖畫面並生成搭配文案，發布圖片貼文
-  --analyze      對指定貼文進行零樣本分類，判斷是否為潛在客戶並產出回覆
-  --all          依序執行 post 與 analyze（適合排程使用）
-  --report       擷取過去 7 天貼文的互動數據，AI 分析高低互動差異，
-                 輸出對 brand.ts / styles.ts 的具體修改建議，
-                 報告儲存於 docs/reports/YYYY-MM-DD.md
+  --post               依今日日期選定功能與風格，AI 生成貼文後發布到 Threads
+  --image-post         依今日日期選定截圖，AI 分析截圖畫面並生成搭配文案，發布圖片貼文
+  --analyze            對指定貼文進行零樣本分類，判斷是否為潛在客戶並產出回覆
+  --all                依序執行 post 與 analyze（適合排程使用）
+  --analyze-reference  讀取 docs/reference-posts.md，AI 提取高流量貼文的寫作模式，
+                       自動更新 brand.ts（寫作原則）與 styles.ts（風格指令）
+  --report             擷取過去 7 天貼文的互動數據，AI 分析高低互動差異，
+                       輸出對 brand.ts / styles.ts 的具體修改建議，
+                       報告儲存於 docs/reports/YYYY-MM-DD.md
 `);
             break;
     }

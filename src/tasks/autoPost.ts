@@ -2,10 +2,13 @@
 // 此模組只 export 函式，不含 top-level 副作用，由 agent 決定何時呼叫
 
 import { BRAND_CONTEXT } from '../data/brand.js';
+import { createInterface } from 'readline/promises';
+
+import { stdin as input, stdout as output } from 'node:process';
 import { GLOWMOMENT_FEATURES, type Feature } from '../data/features.js';
 import { POST_STYLES, type PostStyle } from '../data/styles.js';
 import { callChatCompletion } from '../services/hf.js';
-import { refreshToken, createContainer, publishContainer } from '../services/threads.js';
+import { getUsableToken, createContainer, publishContainer } from '../services/threads.js';
 
 export type AutoPostResult =
     | { success: true; postId: string; content: string; feature: string; style: string }
@@ -44,9 +47,21 @@ async function generateContent(feature: Feature, style: PostStyle): Promise<stri
         { role: 'user', content: userPrompt },
     ]);
 }
+/**
+ * 發布前的互動確認：只有輸入 y/yes 才會真的發佈。
+ */
+async function confirmPublish(): Promise<boolean> {
+    const rl = createInterface({ input, output });
+    try {
+        const answer = (await rl.question('\n⚠️ 是否要發布這則貼文？輸入 y 發布，其他任意鍵取消：')).trim().toLowerCase();
+        return answer === 'y' || answer === 'yes';
+    } finally {
+        rl.close();
+    }
+}
 
 /**
- * 完整的自動發文流程：刷新 Token → 生成內容 → 建立容器 → 發布
+ * 完整的自動發文流程：取得可用 Token → 生成內容 → 建立容器 → 發布
  */
 export async function runAutoPost(): Promise<AutoPostResult> {
     const { feature, style } = getTodaysConfig();
@@ -54,8 +69,8 @@ export async function runAutoPost(): Promise<AutoPostResult> {
     console.log(`📌 今日功能：${feature.name}`);
     console.log(`🎨 今日風格：${style.name}`);
 
-    console.log('\n🔑 正在刷新 Threads Access Token...');
-    const token = await refreshToken();
+    console.log('\n🔑 讀取 Threads Access Token...');
+    const token = await getUsableToken();
 
     console.log('\n🤖 正在生成貼文內容...');
     const content = await generateContent(feature, style);
@@ -63,7 +78,13 @@ export async function runAutoPost(): Promise<AutoPostResult> {
     console.log('─'.repeat(40));
     console.log(content);
     console.log('─'.repeat(40));
-
+    const shouldPublish = await confirmPublish();
+    if (!shouldPublish) {
+        return {
+            success: false,
+            error: '已取消發布（測試模式）。',
+        };
+    }
     console.log('\n📦 正在建立 Threads 媒體容器...');
     const containerId = await createContainer(content, token);
     console.log(`✅ 容器建立成功，ID：${containerId}`);

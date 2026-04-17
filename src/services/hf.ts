@@ -1,6 +1,8 @@
 // Hugging Face API 底層封裝，兩個任務（發文 / 分析回覆）共用此模組
 // 只負責 HTTP 請求與錯誤轉換，不含任何業務邏輯
 
+import { Converter } from 'opencc-js';
+
 // ─── 型別定義 ────────────────────────────────────────────────────────────────
 
 /**
@@ -28,8 +30,12 @@ export type ZeroShotItem = {
 // HF Router 統一入口，支援 OpenAI 相容的 Chat Completion 格式
 const HF_CHAT_URL = 'https://router.huggingface.co/v1/chat/completions';
 
-// HF Inference API 各模型的 base URL，使用時需在後方接上 /modelOwner/modelName
+// HF Router 推理端點（零樣本分類等任務用）
 const HF_INFERENCE_BASE = 'https://router.huggingface.co/hf-inference/models';
+
+const toTraditionalChinese = Converter({ from: 'cn', to: 'twp' });
+const simplifiedPattern = /[为与这那们个么后开关产发图显线网统务点动备传输页写设话时来会应实无体务头条并从]|说明|页面|用户|系统|数据|显示/g;
+
 
 // ─── 內部工具函式 ────────────────────────────────────────────────────────────
 
@@ -53,69 +59,6 @@ function encodeModelId(model: string): string {
 
 // ─── 公開 API ────────────────────────────────────────────────────────────────
 
-/**
- * 呼叫 Hugging Face 視覺語言模型，對截圖自動生成繁體中文畫面描述
- * 使用 Qwen2-VL-7B-Instruct，支援直接以中文提問，省去翻譯步驟
- *
- * 圖片透過 base64 data URL 傳入，不需要圖片對外公開；
- * 描述結果作為後續文案生成的 context，讓 LLM 知道圖片畫面內容
- *
- * @param imageBase64 - 圖片的 base64 字串（不含 data:image/... 前綴）
- * @param mimeType    - 圖片 MIME 類型，預設 'image/png'
- * @returns 繁體中文的截圖畫面描述（約 50~100 字）
- */
-export async function callVisionDescription(
-    imageBase64: string,
-    mimeType: 'image/png' | 'image/jpeg' | 'image/webp' = 'image/png',
-): Promise<string> {
-    // 組成 data URL 讓 HF API 能識別圖片格式
-    const dataUrl = `data:${mimeType};base64,${imageBase64}`;
-
-    const response = await fetch(HF_CHAT_URL, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${getToken()}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            model: 'Qwen/Qwen2-VL-7B-Instruct',
-            // content 為陣列格式（OpenAI Vision 相容），同時傳入圖片與文字提示
-            messages: [{
-                role: 'user',
-                content: [
-                    {
-                        type: 'image_url',
-                        image_url: { url: dataUrl },
-                    },
-                    {
-                        type: 'text',
-                        text: [
-                            '請用繁體中文描述這張 SaaS 產品截圖的畫面內容。',
-                            '說明畫面中有哪些 UI 元素、顯示了什麼資訊、使用者在這個畫面能做什麼操作。',
-                            '描述長度約 50～80 字，不需要評價好壞，只需要客觀描述畫面。',
-                        ].join(''),
-                    },
-                ],
-            }],
-            max_tokens: 200,
-            stream: false,
-        }),
-    });
-
-    const data: unknown = await response.json().catch(() => null);
-
-    if (!response.ok) {
-        const msg =
-            typeof data === 'object' && data !== null && 'error' in data
-                ? JSON.stringify((data as Record<string, unknown>).error)
-                : `HF Vision API 失敗：${response.status}`;
-        throw new Error(msg);
-    }
-
-    const content = (data as ChatCompletionResponse).choices?.[0]?.message?.content?.trim();
-    if (!content) throw new Error('Vision 模型回傳格式不正確。');
-    return content;
-}
 
 /**
  * 呼叫 Hugging Face Chat Completions，適用於支援指令格式的模型（如 Qwen、Mistral）
@@ -157,7 +100,25 @@ export async function callChatCompletion(
     // 取 choices[0].message.content，並去除前後空白
     const content = (data as ChatCompletionResponse).choices?.[0]?.message?.content?.trim();
     if (!content) throw new Error('Chat completion 回傳格式不正確。');
-    return content;
+
+    // Qwen 偶爾仍會回傳簡體，於底層做保底轉換，避免各任務重複實作。
+    const normalized = normalizeTraditionalChinese(content);
+    return normalized;
+}
+
+function normalizeTraditionalChinese(text: string): string {
+    if (!text) return text;
+    if (!containsCjk(text)) return text;
+    if (isLikelyTraditionalChinese(text)) return text;
+    return toTraditionalChinese(text);
+}
+
+function containsCjk(text: string): boolean {
+    return /[\u3400-\u9fff]/.test(text);
+}
+
+function isLikelyTraditionalChinese(text: string): boolean {
+    return !simplifiedPattern.test(text);
 }
 
 /**

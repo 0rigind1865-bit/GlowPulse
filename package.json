@@ -8,6 +8,7 @@
     "image-post": "tsx src/agent.ts --image-post",
     "analyze": "tsx src/agent.ts --analyze",
     "all": "tsx src/agent.ts --all",
+    "learn": "tsx src/agent.ts --analyze-reference",
     "report": "tsx src/agent.ts --report",
     "agent": "tsx src/agent.ts"
   },
@@ -16,7 +17,9 @@
   "license": "ISC",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
+    "@google/generative-ai": "^0.24.1",
     "dotenv": "^17.4.2",
+    "opencc-js": "^1.0.5",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2"
   },

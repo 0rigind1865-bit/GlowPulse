@@ -12,6 +12,8 @@ const THREADS_API_BASE = 'https://graph.threads.net/v1.0';
 
 // Token 刷新端點獨立於一般 API，使用不同的 URL
 const THREADS_TOKEN_REFRESH_URL = 'https://graph.threads.net/refresh_access_token';
+const TOKEN_MAX_AGE_DAYS = 60;
+const TOKEN_REFRESH_BUFFER_DAYS = 5;
 
 // ─── 內部工具函式 ────────────────────────────────────────────────────────────
 
@@ -81,9 +83,9 @@ export async function refreshToken(): Promise<string> {
     // 型別收窄：確認回應中確實有 access_token 字串欄位
     const newToken =
         typeof data === 'object' &&
-        data !== null &&
-        'access_token' in data &&
-        typeof (data as Record<string, unknown>).access_token === 'string'
+            data !== null &&
+            'access_token' in data &&
+            typeof (data as Record<string, unknown>).access_token === 'string'
             ? (data as Record<string, string>).access_token
             : null;
 
@@ -92,15 +94,13 @@ export async function refreshToken(): Promise<string> {
     }
 
     // 自動寫回 .env，下次執行不需要手動更新
-    // 用正則取代而非覆寫整個檔案，保留其他環境變數不動
+    // 同步記錄刷新時間，供後續判斷是否需要再次刷新
     try {
         const envPath = join(dirname(fileURLToPath(import.meta.url)), '../../.env');
         const content = readFileSync(envPath, 'utf-8');
-        writeFileSync(
-            envPath,
-            content.replace(/^THREADS_ACCESS_TOKEN=.*/m, `THREADS_ACCESS_TOKEN=${newToken}`),
-            'utf-8',
-        );
+        const withToken = upsertEnvLine(content, 'THREADS_ACCESS_TOKEN', newToken);
+        const withTimestamp = upsertEnvLine(withToken, 'THREADS_TOKEN_REFRESHED_AT', new Date().toISOString());
+        writeFileSync(envPath, withTimestamp, 'utf-8');
         console.log('🔄 Token 已刷新並寫回 .env');
     } catch {
         // 寫回失敗不影響本次執行，僅提示需手動更新
@@ -108,6 +108,43 @@ export async function refreshToken(): Promise<string> {
     }
 
     return newToken;
+}
+
+/**
+ * 取得可用 token：
+ * - 預設直接使用現有 token（不每次刷新）
+ * - 僅在接近 60 天到期（預設剩 5 天內）時才刷新
+ */
+export async function getUsableToken(): Promise<string> {
+    const { token } = getCredentials();
+    const refreshedAtRaw = process.env.THREADS_TOKEN_REFRESHED_AT?.trim();
+    if (!refreshedAtRaw) {
+        return token;
+    }
+
+    const refreshedAt = new Date(refreshedAtRaw);
+    if (Number.isNaN(refreshedAt.getTime())) {
+        return token;
+    }
+
+    const ageMs = Date.now() - refreshedAt.getTime();
+    const ageDays = ageMs / (24 * 60 * 60 * 1000);
+    if (ageDays >= TOKEN_MAX_AGE_DAYS - TOKEN_REFRESH_BUFFER_DAYS) {
+        console.log('🔄 Threads Token 接近到期，正在自動刷新...');
+        return refreshToken();
+    }
+
+    return token;
+}
+
+function upsertEnvLine(content: string, key: string, value: string): string {
+    const line = `${key}=${value}`;
+    const pattern = new RegExp(`^${key}=.*$`, 'm');
+    if (pattern.test(content)) {
+        return content.replace(pattern, line);
+    }
+    const suffix = content.endsWith('\n') ? '' : '\n';
+    return `${content}${suffix}${line}\n`;
 }
 
 // ─── 發文流程（兩步驟） ──────────────────────────────────────────────────────
@@ -298,10 +335,10 @@ export async function fetchPostInsights(
     const metrics = (data as InsightsResponse).data ?? [];
     const get = (name: string) => metrics.find(m => m.name === name)?.values[0]?.value ?? 0;
 
-    const likes   = get('likes');
+    const likes = get('likes');
     const replies = get('replies');
     const reposts = get('reposts');
-    const quotes  = get('quotes');
+    const quotes = get('quotes');
 
     return {
         postId,

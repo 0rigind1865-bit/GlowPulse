@@ -10,6 +10,12 @@ export type Feature = {
 
 export const GLOWMOMENT_FEATURES: Feature[] = [
     {
+        name: '服務項目管理',
+        pain: '管理服務項目複雜且耗時',
+        solution: '提供直覺式介面，快速編輯服務項目，包括名稱、時間、價格等資訊',
+        hook: '輕鬆管理，提升工作效率',
+    },
+    {
         name: '24小時線上預約',
         pain: '半夜有客人想預約，但你已經睡了，訊息到早上才回，客人早就跑去別家了',
         solution: 'GlowMoment 提供 24 小時自動接單的專屬預約頁面，客人隨時選時段、立即確認，你睡著也不會漏單',
