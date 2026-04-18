@@ -274,6 +274,28 @@ export async function runImagePost(maxChars?: number, useLatest = false): Promis
     if (useLatest) {
         console.log('🆕 使用最新截圖（--latest）');
     }
+
+    // Meta API 要求圖片 URL 只能含 ASCII 字元
+    // 中文、空格、特殊字元都會導致「影音素材 URI 不符合規定」錯誤
+    if (/[^\x00-\x7F]/.test(screenshot.githubUrl)) {
+        return {
+            success: false,
+            error: [
+                `❌ 截圖檔名含有非 ASCII 字元，Meta API 不接受此 URL：`,
+                `   ${screenshot.githubUrl}`,
+                ``,
+                `請將截圖檔名改為純英數字，例如：`,
+                `   ✗ 截圖 2026-04-18 晚上8.14.31.png`,
+                `   ✓ booking-confirm.png 或 screenshot-20260418.png`,
+                ``,
+                `步驟：`,
+                `1. 在 assets/screenshots/ 重新命名檔案（只用英文、數字、連字號）`,
+                `2. git add . && git commit && git push`,
+                `3. 更新 src/data/screenshots.ts 的 filename 與 githubUrl`,
+            ].join('\n'),
+        };
+    }
+
     let workingScreenshot = screenshot;
 
     console.log(`🖼️  今日截圖：${screenshot.filename}`);
