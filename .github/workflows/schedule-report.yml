@@ -1,0 +1,46 @@
+name: 每週成效報告
+
+# 每週一台灣時間 09:00（UTC 01:00）產生上週發文成效週報
+# AI 分析高低互動差異，自動更新 brand.ts / styles.ts，並將報告 commit 回 repo
+
+on:
+  schedule:
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # 允許 commit 週報與 data 層更新
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: 產生週報並更新 data 層
+        run: npm run report -- --yes
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+
+      - name: Commit 週報與 data 層更新
+        run: |
+          git config user.name  "GlowPulse Bot"
+          git config user.email "bot@glowpulse.local"
+          git add docs/reports/ src/data/brand.ts src/data/styles.ts
+          git diff --staged --quiet || git commit -m "chore: 自動週報 $(date '+%Y-%m-%d')"
+          git push

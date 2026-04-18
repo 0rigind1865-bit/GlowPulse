@@ -1,0 +1,53 @@
+name: 每日圖片貼文
+
+# 每週二、四 台灣時間 10:00（UTC 02:00）自動發布圖片宣傳貼文
+# 圖片由 screenshots.ts 隨機選取；新增截圖後可改用 --latest 選最新的
+
+on:
+  schedule:
+    - cron: '0 2 * * 2,4'
+  workflow_dispatch:
+    inputs:
+      use_latest:
+        description: '使用最新截圖（--latest）'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  image-post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15   # 圖片上傳比文字慢，給較長的逾時
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: 發布圖片貼文（隨機截圖）
+        if: ${{ github.event.inputs.use_latest != 'true' }}
+        run: npm run image-post -- --yes
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+
+      - name: 發布圖片貼文（最新截圖）
+        if: ${{ github.event.inputs.use_latest == 'true' }}
+        run: npm run image-post -- --yes --latest
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}

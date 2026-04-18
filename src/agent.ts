@@ -36,6 +36,12 @@ function parseMaxChars(): number | undefined {
 const maxChars = parseMaxChars();
 const useLatest = args.includes('--latest');
 
+// --yes：自動確認所有互動提示，適用於排程執行（GitHub Actions / cron）
+// 透過環境變數傳遞，讓 confirm.ts 工具函式能讀到，不需逐層傳遞參數
+if (args.includes('--yes')) {
+    process.env.GLOW_AUTO_CONFIRM = '1';
+}
+
 async function main(): Promise<void> {
     switch (mode) {
         case '--post': {
