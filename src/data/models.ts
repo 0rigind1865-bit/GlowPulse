@@ -112,6 +112,18 @@ export const MODELS = {
             ],
         },
 
+        /**
+         * genStyles.ts：從 BRAND_CONTEXT 技巧衍生新 PostStyle 條目
+         * 需要理解品牌語境並輸出結構化 JSON，三層備援
+         */
+        genStyles: {
+            candidates: [
+                { provider: 'claude', model: 'claude-haiku-4-5' },
+                { provider: 'gemini', model: 'gemini-2.5-flash' },
+                { provider: 'hf',     model: 'Qwen/Qwen2.5-7B-Instruct' },
+            ],
+        },
+
     } satisfies Record<string, ModelRoute>,
 
     // ── Gemini 視覺模型（直接圖片輸入，不走 generate()）────────────────────────

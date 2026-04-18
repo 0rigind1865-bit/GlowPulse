@@ -10,6 +10,7 @@ import { runImagePost } from './tasks/imagePost.js';
 import { runAnalyzeReference } from './tasks/analyzeReference.js';
 import { runReplyTo } from './tasks/replyTo.js';
 import { runEngage } from './tasks/engage.js';
+import { runGenStyles } from './tasks/genStyles.js';
 
 // 從 CLI 參數解析執行模式與選項
 // 範例：tsx src/agent.ts --post
@@ -172,6 +173,21 @@ async function main(): Promise<void> {
             break;
         }
 
+        case '--gen-styles': {
+            // 從 BRAND_CONTEXT 的寫作技巧自動衍生新 POST_STYLES，擴充風格庫
+            const result = await runGenStyles();
+            if (!result.success) {
+                console.error('\n❌ 風格生成失敗：', result.error);
+                process.exit(1);
+            }
+            if (result.newStylesCount > 0) {
+                console.log(`\n🎉 風格庫已擴充！新增 ${result.newStylesCount} 個風格，共 ${result.totalStyles} 個`);
+            } else {
+                console.log('\n✅ 完成（未新增風格）');
+            }
+            break;
+        }
+
         default:
             console.log(`
 GlowPulse Agent — GlowMoment 社群自動化工具
@@ -188,6 +204,7 @@ GlowPulse Agent — GlowMoment 社群自動化工具
   npm run engage                           掃描自己近期貼文的留言，逐一回覆潛在客戶
   npm run all                              執行完整每日任務（發文 + 分析）
   npm run learn                            分析 reference-posts.md，AI 提取寫作模式並更新 data 層
+  npm run gen-styles                       從 brand.ts 的寫作技巧自動衍生新發文風格，擴充風格庫
   npm run report                           產生本週發文成效報告 + AI 改進建議
 
 選項：
@@ -208,6 +225,8 @@ GlowPulse Agent — GlowMoment 社群自動化工具
   --all                依序執行 post 與 analyze（適合排程使用）
   --analyze-reference  讀取 docs/reference-posts.md，AI 提取高流量貼文的寫作模式，
                        自動更新 brand.ts（寫作原則）與 styles.ts（風格指令）
+  --gen-styles         讀取 BRAND_CONTEXT 的【從優質貼文學到的技巧】，AI 將每條技巧
+                       轉化成新的 PostStyle 條目，擴充 styles.ts 風格庫（7-9 個風格）
   --report             擷取過去 7 天貼文的互動數據，AI 分析高低互動差異，
                        輸出對 brand.ts / styles.ts 的具體修改建議，
                        報告儲存於 docs/reports/YYYY-MM-DD.md
