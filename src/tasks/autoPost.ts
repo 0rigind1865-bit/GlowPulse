@@ -123,11 +123,17 @@ export async function runAutoPost(maxChars?: number): Promise<AutoPostResult> {
 
     // 發布接續留言（若有）
     if (replyText) {
-        await new Promise(r => setTimeout(r, 1500)); // 等待主貼文建立完成
-        console.log('\n💬 正在發布接續留言...');
+        // 等待主貼文在 Threads 伺服器端完全處理完畢，再建立回覆容器
+        console.log('\n⏳ 等待主貼文處理完成（3 秒）...');
+        await new Promise(r => setTimeout(r, 3000));
+        console.log('\n💬 正在建立接續留言容器...');
+        console.log(`   reply_to_id：${postId}`);
         const replyContainerId = await createReplyContainer(replyText, postId, token);
-        await publishContainer(replyContainerId, token);
-        console.log('✅ 接續留言已發布');
+        console.log(`   留言容器 ID：${replyContainerId}`);
+        console.log('🚀 正在發布接續留言...');
+        const replyPostId = await publishContainer(replyContainerId, token);
+        console.log(`✅ 接續留言已發布，Reply Post ID：${replyPostId}`);
+        console.log('   （留言不會出現在個人頁，請點入原始貼文查看串留言）');
     }
 
     return { success: true, postId, content, feature: feature.name, style: style.name };
