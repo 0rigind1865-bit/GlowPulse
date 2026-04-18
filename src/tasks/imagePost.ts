@@ -31,13 +31,9 @@ const FEATURES_DATA_PATH = new URL('../data/features.ts', import.meta.url);
  * 與 autoPost 共用相同的日期輪替邏輯，確保可重現
  */
 function getTodaysConfig(): { screenshot: Screenshot; style: PostStyle } {
-    const now = new Date();
-    const dayOfYear = Math.floor(
-        (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000,
-    );
     return {
-        screenshot: SCREENSHOTS[1],
-        style: POST_STYLES[dayOfYear % POST_STYLES.length],
+        screenshot: SCREENSHOTS[Math.floor(Math.random() * SCREENSHOTS.length)],
+        style: POST_STYLES[Math.floor(Math.random() * POST_STYLES.length)],
     };
 }
 
