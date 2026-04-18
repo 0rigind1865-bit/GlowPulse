@@ -7,13 +7,11 @@
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { callClaude } from '../services/claude.js';
-import { callChatCompletion } from '../services/hf.js';
+import { generate } from '../services/generate.js';
 import { BRAND_CONTEXT } from '../data/brand.js';
 import { POST_STYLES } from '../data/styles.js';
 import { parseDataUpdates, stripUpdatesBlock, applyDataUpdates } from '../utils/dataUpdater.js';
 import { confirmAction } from '../utils/confirm.js';
-import { MODELS } from '../data/models.js';
 
 const DOCS_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../docs');
 
@@ -210,33 +208,7 @@ async function analyzeWithAI(posts: ReferencePost[]): Promise<string> {
         '（說明每個風格指令改了什麼、為什麼這樣改，讓 AI 生成的文字更接近參考貼文的質感）',
     ].join('\n');
 
-    try {
-        return await callClaude(system, prompt, 3000);
-    } catch (err) {
-        const msg = err instanceof Error ? err.message : '';
-        // 三種情況都退回 HF：餘額不足、API Key 未設定、Key 無效
-        const shouldFallback =
-            msg.includes('credit balance') ||
-            msg.includes('billing') ||
-            msg.includes('ANTHROPIC_API_KEY') ||
-            msg.includes('authentication') ||
-            msg.includes('401');
-        if (shouldFallback) {
-            console.warn('⚠️  Claude 無法使用，退回 Hugging Face（分析品質可能略差）');
-            if (msg.includes('ANTHROPIC_API_KEY')) {
-                console.warn('   原因：未設定 ANTHROPIC_API_KEY，請至 https://console.anthropic.com/ 取得');
-            } else {
-                console.warn('   充值：https://console.anthropic.com/settings/billing');
-            }
-            return callChatCompletion(
-                MODELS.hf.analysisBackup,
-                [{ role: 'user', content: `請全程使用繁體中文回應，嚴禁使用簡體中文。\n\n${prompt}` }],
-                0.5,
-                2000,
-            );
-        }
-        throw err;
-    }
+    return generate('referenceAnalysis', system, prompt, 3000, 0.5);
 }
 
 // ─── 主流程 ──────────────────────────────────────────────────────────────────

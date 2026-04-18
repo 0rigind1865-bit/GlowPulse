@@ -149,6 +149,46 @@ function isModelNotFound(message: string): boolean {
     return m.includes('404') || m.includes('not found') || m.includes('is not supported for generatecontent');
 }
 
+/**
+ * 純文字生成（不含圖片），供 generate() 路由使用
+ * 以 systemInstruction 傳入 system prompt，Gemini 原生支援此欄位
+ *
+ * @param model      - 模型名稱，例如 'gemini-2.5-flash'
+ * @param system     - System prompt（角色設定與語言規範）
+ * @param prompt     - 使用者提示
+ */
+export async function generateTextWithGemini(
+    model: string,
+    system: string,
+    prompt: string,
+): Promise<string> {
+    const geminiModel = getClient().getGenerativeModel({
+        model,
+        ...(system ? { systemInstruction: system } : {}),
+    });
+
+    try {
+        const result = await geminiModel.generateContent(prompt);
+        const text = result.response.text().trim();
+        if (!text) {
+            throw new GeminiServiceError('REQUEST_FAILED', 'Gemini 文字生成回傳為空。');
+        }
+        return text;
+    } catch (e: unknown) {
+        if (e instanceof GeminiServiceError) throw e;
+        const message = e instanceof Error ? e.message : String(e);
+        const errorObj = e instanceof Object ? (e as Record<string, unknown>) : {};
+        const statusCode = (errorObj.status || '').toString();
+        if (statusCode === '429' || isQuotaExceeded(message)) {
+            throw new GeminiServiceError('QUOTA_EXCEEDED', message);
+        }
+        if (isModelNotFound(message)) {
+            throw new GeminiServiceError('MODEL_NOT_FOUND', message);
+        }
+        throw new GeminiServiceError('REQUEST_FAILED', message);
+    }
+}
+
 function isLikelyTraditionalChinese(text: string): boolean {
     // 必須至少含有一定比例的中日韓統一表意文字，避免回傳整段英文。
     const cjkChars = text.match(/[\u3400-\u9fff]/g) ?? [];

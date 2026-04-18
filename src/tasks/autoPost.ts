@@ -3,10 +3,9 @@
 
 import { BRAND_CONTEXT } from '../data/brand.js';
 import { GLOWMOMENT_FEATURES, type Feature } from '../data/features.js';
-import { MODELS } from '../data/models.js';
 import { confirmAction } from '../utils/confirm.js';
 import { POST_STYLES, type PostStyle } from '../data/styles.js';
-import { callChatCompletion } from '../services/hf.js';
+import { generate } from '../services/generate.js';
 import { getUsableToken, createContainer, publishContainer } from '../services/threads.js';
 
 export type AutoPostResult =
@@ -41,10 +40,7 @@ async function generateContent(feature: Feature, style: PostStyle): Promise<stri
         `請依照以上資訊，寫出一則 Threads 貼文。只輸出貼文本身，不要加任何前言或說明。`,
     ].join('\n');
 
-    return callChatCompletion(MODELS.hf.textGeneration, [
-        { role: 'system', content: BRAND_CONTEXT },
-        { role: 'user', content: userPrompt },
-    ]);
+    return generate('autoPost', BRAND_CONTEXT, userPrompt, 180, 0.85);
 }
 /**
  * 完整的自動發文流程：取得可用 Token → 生成內容 → 建立容器 → 發布

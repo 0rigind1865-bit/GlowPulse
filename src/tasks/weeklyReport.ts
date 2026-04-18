@@ -5,13 +5,11 @@ import { mkdirSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getUsableToken, fetchMyPosts, fetchPostInsights, type PostInsights } from '../services/threads.js';
-import { callClaude } from '../services/claude.js';
-import { callChatCompletion } from '../services/hf.js';
+import { generate } from '../services/generate.js';
 import { BRAND_CONTEXT } from '../data/brand.js';
 import { POST_STYLES } from '../data/styles.js';
 import { parseDataUpdates, stripUpdatesBlock, applyDataUpdates } from '../utils/dataUpdater.js';
 import { confirmAction } from '../utils/confirm.js';
-import { MODELS } from '../data/models.js';
 
 const REPORTS_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../docs/reports');
 
@@ -101,34 +99,7 @@ async function analyzeWithAI(
         '直接給出可以貼上的文字，不要只說「應該更好」這種空話）',
     ].join('\n');
 
-    // 優先 Claude Haiku；餘額不足自動退回 HF
-    try {
-        return await callClaude(system, prompt, 3000);
-    } catch (err) {
-        const msg = err instanceof Error ? err.message : '';
-        const shouldFallback =
-            msg.includes('credit balance') ||
-            msg.includes('billing') ||
-            msg.includes('ANTHROPIC_API_KEY') ||
-            msg.includes('authentication') ||
-            msg.includes('401');
-        if (shouldFallback) {
-            console.warn('⚠️  Claude 無法使用，退回使用 Hugging Face（繁體中文品質可能略差，自動更新可能無法執行）');
-            if (msg.includes('ANTHROPIC_API_KEY')) {
-                console.warn('   原因：未設定 ANTHROPIC_API_KEY，請至 https://console.anthropic.com/ 取得');
-            } else {
-                console.warn('   充值：https://console.anthropic.com/settings/billing');
-            }
-            const hfPrompt = `請全程使用繁體中文回應，嚴禁使用簡體中文。\n\n${prompt}`;
-            return callChatCompletion(
-                MODELS.hf.analysisBackup,
-                [{ role: 'user', content: hfPrompt }],
-                0.5,
-                2000,
-            );
-        }
-        throw err;
-    }
+    return generate('weeklyAnalysis', system, prompt, 3000, 0.5);
 }
 
 // ─── 報告儲存 ────────────────────────────────────────────────────────────────

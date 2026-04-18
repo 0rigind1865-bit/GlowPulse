@@ -2,7 +2,6 @@
 // 只處理 HTTP 層，錯誤一律轉為 Error 向上拋出
 
 import Anthropic from '@anthropic-ai/sdk';
-import { MODELS } from '../data/models.js';
 
 // ─── Client 初始化 ───────────────────────────────────────────────────────────
 
@@ -47,7 +46,7 @@ export async function callClaude(
     system: string,
     userPrompt: string,
     maxTokens = 2000,
-    model = MODELS.claude.analysis,
+    model = 'claude-haiku-4-5',
 ): Promise<string> {
     const client = getClient();
 
