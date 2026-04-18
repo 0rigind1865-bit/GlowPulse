@@ -2,9 +2,8 @@
 // 流程與 autoPost.ts 相似，差異在多了視覺描述步驟，且發布的是圖片貼文
 
 import { BRAND_CONTEXT } from '../data/brand.js';
-import { createInterface } from 'node:readline/promises';
-import { stdin as input, stdout as output } from 'node:process';
 import { readFile, writeFile } from 'node:fs/promises';
+import { confirmAction } from '../utils/confirm.js';
 import { GLOWMOMENT_FEATURES, type Feature } from '../data/features.js';
 import { POST_STYLES, type PostStyle } from '../data/styles.js';
 import { SCREENSHOTS, type Screenshot } from '../data/screenshots.js';
@@ -31,7 +30,7 @@ function getTodaysConfig(): { screenshot: Screenshot; style: PostStyle } {
         (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000,
     );
     return {
-        screenshot: SCREENSHOTS[dayOfYear % SCREENSHOTS.length],
+        screenshot: SCREENSHOTS[1],
         style: POST_STYLES[dayOfYear % POST_STYLES.length],
     };
 }
@@ -249,19 +248,6 @@ function escapeRegExp(text: string): string {
     return text.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
 }
 
-/**
- * 發布前的互動確認：只有輸入 y/yes 才會真的發佈。
- */
-async function confirmPublish(): Promise<boolean> {
-    const rl = createInterface({ input, output });
-    try {
-        const answer = (await rl.question('\n⚠️ 是否要發布這則貼文？輸入 y 發布，其他任意鍵取消：')).trim().toLowerCase();
-        return answer === 'y' || answer === 'yes';
-    } finally {
-        rl.close();
-    }
-}
-
 // ─── 主流程 ──────────────────────────────────────────────────────────────────
 
 /**
@@ -350,7 +336,7 @@ export async function runImagePost(): Promise<ImagePostResult> {
     console.log(caption);
     console.log('─'.repeat(40));
 
-    const shouldPublish = await confirmPublish();
+    const shouldPublish = await confirmAction('是否要發布這則圖片貼文到 Threads？');
     if (!shouldPublish) {
         return {
             success: false,

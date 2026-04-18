@@ -10,6 +10,7 @@ import { callChatCompletion } from '../services/hf.js';
 import { BRAND_CONTEXT } from '../data/brand.js';
 import { POST_STYLES } from '../data/styles.js';
 import { parseDataUpdates, stripUpdatesBlock, applyDataUpdates } from '../utils/dataUpdater.js';
+import { confirmAction } from '../utils/confirm.js';
 
 const REPORTS_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../docs/reports');
 
@@ -195,13 +196,28 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
     const rawAiOutput = await analyzeWithAI(topPosts, lowPosts);
 
     // 解析並套用 data 層更新
-    console.log('\n🔧 自動更新 data 層...');
     const updates = parseDataUpdates(rawAiOutput);
     if (updates) {
-        const log = applyDataUpdates(updates);
-        log.forEach(line => console.log(`   ${line}`));
+        const preview = [
+            '📋 AI 建議更新以下 data 層：',
+            updates.brand_principles?.length
+                ? `   brand.ts：${updates.brand_principles.length} 條寫作技巧`
+                : '',
+            updates.styles?.length
+                ? `   styles.ts：${updates.styles.length} 個風格指令`
+                : '',
+        ].filter(Boolean).join('\n');
+
+        const shouldUpdate = await confirmAction('是否將 AI 分析結果寫回 brand.ts / styles.ts？', preview);
+        if (shouldUpdate) {
+            console.log('\n🔧 更新 data 層...');
+            const log = applyDataUpdates(updates);
+            log.forEach(line => console.log(`   ${line}`));
+        } else {
+            console.log('   已跳過 data 層更新（分析報告仍會儲存）');
+        }
     } else {
-        console.log('   ⚠️  未解析到結構化更新區塊，跳過自動更新（手動參考報告中的建議）');
+        console.log('\n   ⚠️  未解析到結構化更新區塊，跳過自動更新（手動參考報告中的建議）');
     }
 
     // 從報告中移除 JSON 區塊，只保留 Markdown 分析

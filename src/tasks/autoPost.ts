@@ -2,10 +2,8 @@
 // 此模組只 export 函式，不含 top-level 副作用，由 agent 決定何時呼叫
 
 import { BRAND_CONTEXT } from '../data/brand.js';
-import { createInterface } from 'readline/promises';
-
-import { stdin as input, stdout as output } from 'node:process';
 import { GLOWMOMENT_FEATURES, type Feature } from '../data/features.js';
+import { confirmAction } from '../utils/confirm.js';
 import { POST_STYLES, type PostStyle } from '../data/styles.js';
 import { callChatCompletion } from '../services/hf.js';
 import { getUsableToken, createContainer, publishContainer } from '../services/threads.js';
@@ -48,19 +46,6 @@ async function generateContent(feature: Feature, style: PostStyle): Promise<stri
     ]);
 }
 /**
- * 發布前的互動確認：只有輸入 y/yes 才會真的發佈。
- */
-async function confirmPublish(): Promise<boolean> {
-    const rl = createInterface({ input, output });
-    try {
-        const answer = (await rl.question('\n⚠️ 是否要發布這則貼文？輸入 y 發布，其他任意鍵取消：')).trim().toLowerCase();
-        return answer === 'y' || answer === 'yes';
-    } finally {
-        rl.close();
-    }
-}
-
-/**
  * 完整的自動發文流程：取得可用 Token → 生成內容 → 建立容器 → 發布
  */
 export async function runAutoPost(): Promise<AutoPostResult> {
@@ -78,7 +63,7 @@ export async function runAutoPost(): Promise<AutoPostResult> {
     console.log('─'.repeat(40));
     console.log(content);
     console.log('─'.repeat(40));
-    const shouldPublish = await confirmPublish();
+    const shouldPublish = await confirmAction('是否要發布這則貼文到 Threads？');
     if (!shouldPublish) {
         return {
             success: false,

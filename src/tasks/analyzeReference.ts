@@ -12,6 +12,7 @@ import { callChatCompletion } from '../services/hf.js';
 import { BRAND_CONTEXT } from '../data/brand.js';
 import { POST_STYLES } from '../data/styles.js';
 import { parseDataUpdates, stripUpdatesBlock, applyDataUpdates } from '../utils/dataUpdater.js';
+import { confirmAction } from '../utils/confirm.js';
 
 const DOCS_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../docs');
 
@@ -293,15 +294,30 @@ export async function runAnalyzeReference(): Promise<AnalyzeReferenceResult> {
     const rawAiOutput = await analyzeWithAI(posts);
 
     // 步驟三：解析並套用 data 層更新
-    console.log('\n🔧 自動更新 data 層...');
     const updates = parseDataUpdates(rawAiOutput);
     let updatedFiles: string[] = [];
 
     if (updates) {
-        const log = applyDataUpdates(updates);
-        log.forEach(line => console.log(`   ${line}`));
-        if (updates.brand_principles?.length) updatedFiles.push('brand.ts');
-        if (updates.styles?.length) updatedFiles.push('styles.ts');
+        const preview = [
+            '📋 AI 建議更新以下 data 層：',
+            updates.brand_principles?.length
+                ? `   brand.ts：${updates.brand_principles.length} 條寫作技巧`
+                : '',
+            updates.styles?.length
+                ? `   styles.ts：${updates.styles.length} 個風格指令`
+                : '',
+        ].filter(Boolean).join('\n');
+
+        const shouldUpdate = await confirmAction('是否將分析結果寫回 brand.ts / styles.ts？', preview);
+        if (shouldUpdate) {
+            console.log('\n🔧 更新 data 層...');
+            const log = applyDataUpdates(updates);
+            log.forEach(line => console.log(`   ${line}`));
+            if (updates.brand_principles?.length) updatedFiles.push('brand.ts');
+            if (updates.styles?.length) updatedFiles.push('styles.ts');
+        } else {
+            console.log('   已跳過 data 層更新');
+        }
     } else {
         console.log('   ⚠️  未解析到結構化更新區塊，跳過自動更新');
         console.log('   （請手動參考以下分析內容調整 data 層）');
