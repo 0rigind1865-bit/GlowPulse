@@ -218,7 +218,9 @@ async function persistScreenshotMetadata(
     description: string,
 ): Promise<void> {
     const source = await readFile(SCREENSHOTS_DATA_PATH, 'utf8');
-    const entryPattern = new RegExp(`\\{[\\s\\S]*?filename:\\s*'${escapeRegExp(screenshot.filename)}'[\\s\\S]*?\\n\\s*\\},`, 'm');
+    // [^{}]* 而非 [\s\S]*?：禁止穿越 {} 邊界，確保只匹配包含目標 filename 的那一筆 entry
+    // screenshots.ts 的 entry 是扁平物件（無巢狀 {}），所以此限制安全且精確
+    const entryPattern = new RegExp(`\\{[^{}]*filename:\\s*'${escapeRegExp(screenshot.filename)}'[^{}]*\\},`);
     const match = source.match(entryPattern);
     if (!match) {
         throw new Error(`找不到對應截圖記錄：${screenshot.filename}`);
