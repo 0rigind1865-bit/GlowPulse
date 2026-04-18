@@ -1,14 +1,15 @@
-name: 每日文字貼文
+name: 每日短貼文
 
-# 每天台灣時間 12:00（UTC 04:00）自動發布文字宣傳貼文
+# 每天台灣時間 20:00（UTC 12:00）發布一篇 130 字元以內的輕鬆短文
+# 字數少、門檻低，補足每日發文量，讓帳號保持活躍感
 
 on:
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '0 12 * * *'
   workflow_dispatch:
 
 jobs:
-  post:
+  short-post:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -25,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: 發布文字貼文
-        run: npm run post -- --yes
+      - name: 發布短貼文
+        run: npm run post -- --yes --max-chars 130
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

@@ -1,11 +1,11 @@
 name: 每日圖片貼文
 
-# 每週二、四 台灣時間 10:00（UTC 02:00）自動發布圖片宣傳貼文
-# 圖片由 screenshots.ts 隨機選取；新增截圖後可改用 --latest 選最新的
+# 每天台灣時間 10:00（UTC 02:00）自動發布圖片宣傳貼文
+# 截圖由 screenshots.ts 隨機選取；手動觸發時可選擇使用最新截圖
 
 on:
   schedule:
-    - cron: '0 2 * * 2,4'
+    - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       use_latest:
@@ -17,7 +17,7 @@ on:
 jobs:
   image-post:
     runs-on: ubuntu-latest
-    timeout-minutes: 15   # 圖片上傳比文字慢，給較長的逾時
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
