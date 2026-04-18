@@ -10,6 +10,9 @@ import { join, dirname } from 'path';
 // Threads Graph API v1.0 的基礎 URL，所有端點都以此為前綴
 const THREADS_API_BASE = 'https://graph.threads.net/v1.0';
 
+/** Threads 單則貼文或留言的字元上限（API 硬性限制） */
+export const THREADS_MAX_TEXT_LENGTH = 500;
+
 // Token 刷新端點獨立於一般 API，使用不同的 URL
 const THREADS_TOKEN_REFRESH_URL = 'https://graph.threads.net/refresh_access_token';
 const TOKEN_MAX_AGE_DAYS = 60;
@@ -235,6 +238,85 @@ export async function publishContainer(containerId: string, token: string): Prom
 
     const id = (data as { id?: string }).id;
     if (!id) throw new Error('Threads 發布回應中缺少 id 欄位。');
+    return id;
+}
+
+/**
+ * 在不超過字元限制的前提下，於自然斷點分割貼文
+ *
+ * 分割優先順序：
+ *   1. 段落空行（\n\n）→ 最自然的閱讀斷點
+ *   2. 句尾標點 + 換行（。\n / ！\n / ？\n）→ 中文句子邊界
+ *   3. 純句尾標點（。／！／？）→ 沒有換行也接受
+ *   4. 行尾（\n）→ 最後才考慮
+ *   5. 硬截斷（強制在限制處切開）→ 保底
+ *
+ * @param text     - 原始完整文字
+ * @param maxChars - 每段上限，預設使用 Threads API 上限（500）
+ * @returns [主貼文, 接續留言]；若原文未超限，接續留言為空字串
+ */
+export function splitForThread(
+    text: string,
+    maxChars = THREADS_MAX_TEXT_LENGTH,
+): [string, string] {
+    if (text.length <= maxChars) return [text, ''];
+
+    const searchIn = text.slice(0, maxChars);
+    const minBreak = Math.floor(maxChars * 0.4); // 至少保留 40% 才算有意義的斷點
+
+    // 優先順序：段落 > 句子+換行 > 句尾標點 > 行尾
+    const candidates: Array<[string, number]> = [
+        ['\n\n', 0],
+        ['。\n', 1], ['！\n', 1], ['？\n', 1],
+        ['。', 2], ['！', 2], ['？', 2],
+        ['\n', 3],
+    ];
+
+    for (const [mark] of candidates) {
+        const idx = searchIn.lastIndexOf(mark);
+        if (idx >= minBreak) {
+            const breakAt = idx + mark.length;
+            return [
+                text.slice(0, breakAt).trimEnd(),
+                text.slice(breakAt).trimStart(),
+            ];
+        }
+    }
+
+    // 保底：硬截斷
+    return [searchIn.trimEnd(), text.slice(maxChars).trimStart()];
+}
+
+/**
+ * 建立 Threads 留言容器（回覆到指定貼文下方）
+ *
+ * 與 createContainer 差異：加入 reply_to_id 指定目標貼文
+ * 容器建立後仍需呼叫 publishContainer() 才會公開
+ *
+ * @param text      - 留言文字（同樣受 500 字元限制）
+ * @param replyToId - 目標貼文的已發布 Post ID（publishContainer 回傳值）
+ * @param token     - 已刷新的 Access Token
+ * @returns creation_id，用於後續發布步驟
+ */
+export async function createReplyContainer(
+    text: string,
+    replyToId: string,
+    token: string,
+): Promise<string> {
+    const { userId } = getCredentials();
+    const url = new URL(`${THREADS_API_BASE}/${userId}/threads`);
+    url.searchParams.set('media_type', 'TEXT');
+    url.searchParams.set('text', text);
+    url.searchParams.set('reply_to_id', replyToId);
+    url.searchParams.set('access_token', token);
+
+    const response = await fetch(url.toString(), { method: 'POST' });
+    const data: unknown = await response.json().catch(() => null);
+
+    if (!response.ok) throw new Error(parseError(data, `Threads 建立留言容器失敗：${response.status}`));
+
+    const id = (data as { id?: string }).id;
+    if (!id) throw new Error('Threads 留言容器回應中缺少 id 欄位。');
     return id;
 }
 

@@ -4,12 +4,18 @@
 import { BRAND_CONTEXT } from '../data/brand.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { confirmAction } from '../utils/confirm.js';
+import { handleOverflow } from '../utils/publish.js';
 import { GLOWMOMENT_FEATURES, type Feature } from '../data/features.js';
 import { POST_STYLES, type PostStyle } from '../data/styles.js';
 import { SCREENSHOTS, type Screenshot } from '../data/screenshots.js';
 import { generate } from '../services/generate.js';
 import { describeImageWithGemini, GeminiServiceError } from '../services/gemini.js';
-import { getUsableToken, createImageContainer, publishContainer } from '../services/threads.js';
+import {
+    getUsableToken,
+    createImageContainer,
+    createReplyContainer,
+    publishContainer,
+} from '../services/threads.js';
 
 export type ImagePostResult =
     | { success: true; postId: string; caption: string; filename: string; feature: string }
@@ -46,6 +52,7 @@ async function generateCaption(
     visualDesc: string,
     screenshot: Screenshot,
     style: PostStyle,
+    forceShorter = false,
 ): Promise<string> {
     // 從 features.ts 找出與截圖對應的功能資訊
     const feature = GLOWMOMENT_FEATURES.find(f => f.name === screenshot.featureName);
@@ -73,8 +80,11 @@ async function generateCaption(
         ``,
         `請根據截圖內容與功能資訊，寫出一則適合搭配這張圖片的 Threads 貼文說明文字。`,
         `文字要能讓沒看過圖片的人也能理解產品價值，看過圖片的人更能產生共鳴。`,
+        forceShorter
+            ? `重要限制：全文（含 hashtag）必須嚴格控制在 450 字元以內，這是硬性要求。`
+            : '',
         `只輸出貼文本身，不要加任何前言或說明。`,
-    ].join('\n');
+    ].filter(Boolean).join('\n');
 
     return generate('imageCaption', BRAND_CONTEXT, userPrompt, 180, 0.85);
 }
@@ -319,20 +329,35 @@ export async function runImagePost(): Promise<ImagePostResult> {
     console.log(visualDesc);
     console.log('─'.repeat(40));
 
-    // 步驟二：文案生成（會先分析截圖描述，再生成貼文）
+    // 步驟二：文案生成（先分析截圖描述，再生成貼文）
     console.log('\n🤖 正在生成圖片搭配文案...');
-    const caption = await generateCaption(visualDesc, workingScreenshot, style);
+    const draft = await generateCaption(visualDesc, workingScreenshot, style);
+
+    // 超限處理：詢問使用者重新生成或以留言接續
+    const overflow = await handleOverflow(
+        draft,
+        () => generateCaption(visualDesc, workingScreenshot, style, true),
+    );
+    if (!overflow) {
+        return { success: false, error: '已取消發布。' };
+    }
+    const { main: caption, reply: replyText } = overflow;
+
     console.log('\n📄 生成的貼文文案：');
     console.log('─'.repeat(40));
     console.log(caption);
+    if (replyText) {
+        console.log('\n💬 接續留言：');
+        console.log(replyText);
+    }
     console.log('─'.repeat(40));
+    console.log(`（主貼文 ${caption.length} 字元${replyText ? `，留言 ${replyText.length} 字元` : ''}）`);
 
-    const shouldPublish = await confirmAction('是否要發布這則圖片貼文到 Threads？');
+    const shouldPublish = await confirmAction(
+        replyText ? '是否要發布圖片貼文＋接續留言到 Threads？' : '是否要發布這則圖片貼文到 Threads？',
+    );
     if (!shouldPublish) {
-        return {
-            success: false,
-            error: '已取消發布（測試模式）。',
-        };
+        return { success: false, error: '已取消發布。' };
     }
 
     // 步驟三：發布
@@ -341,11 +366,18 @@ export async function runImagePost(): Promise<ImagePostResult> {
 
     console.log('\n📦 正在建立 Threads 圖片容器...');
     const containerId = await createImageContainer(workingScreenshot.githubUrl, caption, token);
-    console.log(`✅ 容器建立成功，ID：${containerId}`);
-
     console.log('\n🚀 正在發布圖片貼文...');
     const postId = await publishContainer(containerId, token);
     console.log(`✅ 圖片貼文發布成功，Post ID：${postId}`);
+
+    // 發布接續留言（若有）
+    if (replyText) {
+        await new Promise(r => setTimeout(r, 1500));
+        console.log('\n💬 正在發布接續留言...');
+        const replyContainerId = await createReplyContainer(replyText, postId, token);
+        await publishContainer(replyContainerId, token);
+        console.log('✅ 接續留言已發布');
+    }
 
     return { success: true, postId, caption, filename: workingScreenshot.filename, feature: workingScreenshot.featureName };
 }

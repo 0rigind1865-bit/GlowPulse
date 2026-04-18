@@ -1,4 +1,4 @@
-// 共用互動確認工具：在任何不可逆操作前要求使用者輸入 y 確認
+// 共用互動確認工具：在任何不可逆操作前要求使用者確認
 // 適用場景：發布到 Threads、寫回 brand.ts / styles.ts 等 data 層變更
 
 import { createInterface } from 'readline/promises';
@@ -22,6 +22,32 @@ export async function confirmAction(message: string, preview?: string): Promise<
             .trim()
             .toLowerCase();
         return answer === 'y' || answer === 'yes';
+    } finally {
+        rl.close();
+    }
+}
+
+/**
+ * 顯示編號選項讓使用者選擇，回傳 1-based 選項編號
+ * 輸入非法（非數字或超出範圍）時回傳 null，視為取消
+ *
+ * @param message - 問題描述，顯示在選項清單上方
+ * @param choices - 選項文字陣列（至少一個）
+ * @returns 選擇的選項編號（1-based），或 null（取消）
+ */
+export async function promptChoice(
+    message: string,
+    choices: readonly string[],
+): Promise<number | null> {
+    const rl = createInterface({ input, output });
+    try {
+        console.log(`\n${message}：`);
+        choices.forEach((c, i) => console.log(`  [${i + 1}] ${c}`));
+        const answer = (await rl.question('\n請輸入選項數字：')).trim();
+        const n = parseInt(answer, 10);
+        if (!Number.isNaN(n) && n >= 1 && n <= choices.length) return n;
+        console.log('   無效輸入，視為取消。');
+        return null;
     } finally {
         rl.close();
     }
