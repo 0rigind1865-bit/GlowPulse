@@ -7,6 +7,7 @@ import { confirmAction } from '../utils/confirm.js';
 import { GLOWMOMENT_FEATURES, type Feature } from '../data/features.js';
 import { POST_STYLES, type PostStyle } from '../data/styles.js';
 import { SCREENSHOTS, type Screenshot } from '../data/screenshots.js';
+import { MODELS } from '../data/models.js';
 import { callChatCompletion } from '../services/hf.js';
 import { describeImageWithGemini, GeminiServiceError } from '../services/gemini.js';
 import { getUsableToken, createImageContainer, publishContainer } from '../services/threads.js';
@@ -76,7 +77,7 @@ async function generateCaption(
         `只輸出貼文本身，不要加任何前言或說明。`,
     ].join('\n');
 
-    return callChatCompletion('Qwen/Qwen2.5-7B-Instruct', [
+    return callChatCompletion(MODELS.textGeneration, [
         { role: 'system', content: BRAND_CONTEXT },
         { role: 'user', content: userPrompt },
     ]);
@@ -107,7 +108,7 @@ async function analyzeVisualDescription(
         `不要輸出其他內容。`,
     ].join('\n');
 
-    return callChatCompletion('Qwen/Qwen2.5-7B-Instruct', [
+    return callChatCompletion(MODELS.visualAnalysis, [
         { role: 'system', content: '你是精準的產品畫面分析助理。只輸出繁體中文。' },
         { role: 'user', content: prompt },
     ], 0.2, 220);
@@ -129,7 +130,7 @@ async function generateFeatureFromDescription(visualDesc: string): Promise<Featu
         visualDesc,
     ].join('\n');
 
-    const raw = await callChatCompletion('Qwen/Qwen2.5-7B-Instruct', [
+    const raw = await callChatCompletion(MODELS.visualAnalysis, [
         { role: 'system', content: '你是產品功能規劃助手。必須回傳合法 JSON，不可輸出多餘文字。' },
         { role: 'user', content: prompt },
     ], 0.2, 320);

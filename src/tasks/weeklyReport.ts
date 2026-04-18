@@ -11,6 +11,7 @@ import { BRAND_CONTEXT } from '../data/brand.js';
 import { POST_STYLES } from '../data/styles.js';
 import { parseDataUpdates, stripUpdatesBlock, applyDataUpdates } from '../utils/dataUpdater.js';
 import { confirmAction } from '../utils/confirm.js';
+import { MODELS } from '../data/models.js';
 
 const REPORTS_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../docs/reports');
 
@@ -120,7 +121,7 @@ async function analyzeWithAI(
             }
             const hfPrompt = `請全程使用繁體中文回應，嚴禁使用簡體中文。\n\n${prompt}`;
             return callChatCompletion(
-                'Qwen/Qwen2.5-7B-Instruct',
+                MODELS.hfAnalysis,
                 [{ role: 'user', content: hfPrompt }],
                 0.5,
                 2000,

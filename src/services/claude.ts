@@ -1,7 +1,8 @@
-// Anthropic Claude API 封裝：呼叫 claude-haiku-4-5 生成週報分析
+// Anthropic Claude API 封裝，使用 models.ts 設定的模型生成分析內容
 // 只處理 HTTP 層，錯誤一律轉為 Error 向上拋出
 
 import Anthropic from '@anthropic-ai/sdk';
+import { MODELS } from '../data/models.js';
 
 // ─── Client 初始化 ───────────────────────────────────────────────────────────
 
@@ -46,12 +47,13 @@ export async function callClaude(
     system: string,
     userPrompt: string,
     maxTokens = 2000,
+    model = MODELS.claudeAnalysis,
 ): Promise<string> {
     const client = getClient();
 
     // stream() 建立串流連線；finalMessage() 等待所有 chunk 合併為完整 Message 物件
     const stream = client.messages.stream({
-        model: 'claude-haiku-4-5',
+        model,
         max_tokens: maxTokens,
         system,
         messages: [{ role: 'user', content: userPrompt }],

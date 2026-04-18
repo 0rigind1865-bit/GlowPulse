@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { MODELS } from '../data/models.js';
 
 let _client: GoogleGenerativeAI | null = null;
 
@@ -44,9 +45,8 @@ export async function listAvailableModels(): Promise<string[]> {
 export async function describeImageWithGemini(imageUrl: string): Promise<string> {
     const { data, mimeType } = await fetchImageAsBase64(imageUrl);
 
-    // 2026 年可用模型（優先選擇 2.5 系列）
-    // 舊的 1.5 / 2.0 部分別名已逐步下線，容易出現 404。
-    const modelCandidates = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-pro'];
+    // 從 models.ts 讀取候選清單，依序嘗試至第一個成功為止
+    const modelCandidates = MODELS.visionCandidates;
 
     for (const modelName of modelCandidates) {
         try {

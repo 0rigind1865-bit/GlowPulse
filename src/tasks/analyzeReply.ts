@@ -2,6 +2,7 @@
 // 此模組只 export 函式，不含 top-level 副作用，由 agent 決定何時呼叫
 
 import { BRAND_CONTEXT } from '../data/brand.js';
+import { MODELS } from '../data/models.js';
 import { callChatCompletion, callZeroShot } from '../services/hf.js';
 
 // 零樣本分類的候選標籤，僅前兩個視為潛在客戶
@@ -26,7 +27,7 @@ export async function analyzeAndReply(postContent: string): Promise<string | nul
 
     // 步驟 B：對潛在客戶貼文生成親切自然的品牌回覆
     return callChatCompletion(
-        'Qwen/Qwen2.5-7B-Instruct',
+        MODELS.intentAnalysis,
         [
             { role: 'system', content: BRAND_CONTEXT },
             {
