@@ -121,22 +121,39 @@ export async function refreshToken(): Promise<string> {
 export async function getUsableToken(): Promise<string> {
     const { token } = getCredentials();
     const refreshedAtRaw = process.env.THREADS_TOKEN_REFRESHED_AT?.trim();
+
     if (!refreshedAtRaw) {
+        // THREADS_TOKEN_REFRESHED_AT 未設定：無法計算剩餘天數
+        // 本地開發時不影響（Token 剛設定通常還很新），但 GitHub Actions 跑久後會悄悄過期
+        if (process.env.GITHUB_ACTIONS) {
+            console.log('::warning::THREADS_TOKEN_REFRESHED_AT 未設定，無法追蹤 Token 剩餘天數。請在 Repository Secrets 中新增此變數（值為 Token 最後刷新的 ISO 時間，例如 2026-04-19T00:00:00.000Z）。');
+        }
         return token;
     }
 
     const refreshedAt = new Date(refreshedAtRaw);
     if (Number.isNaN(refreshedAt.getTime())) {
+        console.warn('⚠️  THREADS_TOKEN_REFRESHED_AT 格式錯誤，請填入 ISO 格式（例：2026-04-19T00:00:00.000Z）。');
         return token;
     }
 
-    const ageMs = Date.now() - refreshedAt.getTime();
-    const ageDays = ageMs / (24 * 60 * 60 * 1000);
+    const ageDays = (Date.now() - refreshedAt.getTime()) / (24 * 60 * 60 * 1000);
+    const daysLeft = Math.floor(TOKEN_MAX_AGE_DAYS - ageDays);
+
     if (ageDays >= TOKEN_MAX_AGE_DAYS - TOKEN_REFRESH_BUFFER_DAYS) {
-        console.log('🔄 Threads Token 接近到期，正在自動刷新...');
+        // 剩餘 5 天以內，自動刷新
+        console.log(`🔄 Threads Token 剩餘 ${daysLeft} 天，正在自動刷新...`);
+        if (process.env.GITHUB_ACTIONS) {
+            // 在 GitHub Actions 中刷新後無法自動寫回 Secrets
+            // 刷新仍會執行（本次執行正常），但新 Token 不會被持久化
+            // 執行後請手動更新 THREADS_ACCESS_TOKEN 與 THREADS_TOKEN_REFRESHED_AT 這兩個 Secret
+            console.log('::warning::Token 剩餘天數不足，已嘗試刷新。但 GitHub Actions 無法自動更新 Secrets，請在此次執行後手動更新 THREADS_ACCESS_TOKEN 與 THREADS_TOKEN_REFRESHED_AT。');
+        }
         return refreshToken();
     }
 
+    // 正常狀態：顯示剩餘天數供追蹤
+    console.log(`   Token 剩餘有效期：${daysLeft} 天`);
     return token;
 }
 

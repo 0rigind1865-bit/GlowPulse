@@ -13,7 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: write   # 允許 commit 週報與 data 層更新
+      contents: write       # 允許建立 branch 與 push
+      pull-requests: write  # 允許建立 PR
 
     steps:
       - name: Checkout
@@ -36,11 +37,53 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_TOKEN_REFRESHED_AT: ${{ secrets.THREADS_TOKEN_REFRESHED_AT }}
 
-      - name: Commit 週報與 data 層更新
+      - name: 建立 PR（週報 + data 層更新）
         run: |
           git config user.name  "GlowPulse Bot"
           git config user.email "bot@glowpulse.local"
+
+          # 建立當日的 bot branch，避免直接推 main
+          BRANCH="bot/weekly-report-$(date '+%Y-%m-%d')"
+          git checkout -b "$BRANCH"
           git add docs/reports/ src/data/brand.ts src/data/styles.ts
-          git diff --staged --quiet || git commit -m "chore: 自動週報 $(date '+%Y-%m-%d')"
-          git push
+
+          if git diff --staged --quiet; then
+            echo "本週無發文數據或 AI 未產生變更，跳過建立 PR。"
+            exit 0
+          fi
+
+          git commit -m "chore: 自動週報 $(date '+%Y-%m-%d')"
+          git push origin "$BRANCH"
+
+          # 取得 brand.ts / styles.ts 的 diff 摘要，放進 PR body 供 review
+          BRAND_DIFF=$(git diff HEAD~1 -- src/data/brand.ts | head -60 || true)
+          STYLES_DIFF=$(git diff HEAD~1 -- src/data/styles.ts | head -60 || true)
+
+          gh pr create \
+            --title "📊 週報更新 $(date '+%Y-%m-%d')" \
+            --body "## AI 分析本週發文成效
+
+          請確認以下修改後再 merge：
+
+          - \`docs/reports/\` 本週報告
+          - \`src/data/brand.ts\` 寫作技巧（如有更新）
+          - \`src/data/styles.ts\` 發文風格（如有更新）
+
+          > ⚠️ **請先看 Files changed tab 確認 AI 的建議符合品牌方向，再 merge。**
+          > 特別注意 styles.ts — AI 有時會改寫原有風格指令，不只新增。
+
+          🤖 由 GlowPulse Bot 自動建立" \
+            --base main \
+            --label "bot" 2>/dev/null || \
+          gh pr create \
+            --title "📊 週報更新 $(date '+%Y-%m-%d')" \
+            --body "## AI 分析本週發文成效
+
+          請確認 brand.ts / styles.ts 的 diff 後再 merge。
+
+          🤖 由 GlowPulse Bot 自動建立" \
+            --base main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

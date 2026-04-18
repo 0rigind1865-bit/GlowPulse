@@ -41,6 +41,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_TOKEN_REFRESHED_AT: ${{ secrets.THREADS_TOKEN_REFRESHED_AT }}
 
       - name: 發布圖片貼文（最新截圖）
         if: ${{ github.event.inputs.use_latest == 'true' }}
@@ -51,3 +52,4 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_TOKEN_REFRESHED_AT: ${{ secrets.THREADS_TOKEN_REFRESHED_AT }}
