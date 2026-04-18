@@ -339,6 +339,35 @@ export async function waitForPostReady(
  * @param token     - 已刷新的 Access Token
  * @returns creation_id，用於後續發布步驟
  */
+/**
+ * 查詢 Threads 媒體容器的處理狀態
+ *
+ * 可能的狀態值：
+ *   FINISHED   - 容器已就緒，可呼叫 publishContainer() 發布
+ *   IN_PROGRESS- 正在處理（圖片 / 影片上傳中）
+ *   PUBLISHED  - 已直接發布（部分 TEXT reply container 會跳過 staging）
+ *   ERROR      - 處理失敗；error_message 包含原因
+ *
+ * @returns { status, errorMessage } — errorMessage 只在 ERROR 時有值
+ */
+export async function getContainerStatus(
+    containerId: string,
+    token: string,
+): Promise<{ status: string; errorMessage?: string }> {
+    const url = new URL(`${THREADS_API_BASE}/${containerId}`);
+    url.searchParams.set('fields', 'status,error_message');
+    url.searchParams.set('access_token', token);
+
+    const res = await fetch(url.toString());
+    const data = await res.json().catch(() => null);
+    const d = data as Record<string, unknown> | null;
+
+    return {
+        status: (d?.status as string | undefined) ?? 'UNKNOWN',
+        errorMessage: d?.error_message as string | undefined,
+    };
+}
+
 export async function createReplyContainer(
     text: string,
     replyToId: string,

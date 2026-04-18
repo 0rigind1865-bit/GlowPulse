@@ -14,6 +14,7 @@ import {
     getUsableToken,
     createImageContainer,
     createReplyContainer,
+    getContainerStatus,
     publishContainer,
     waitForPostReady,
 } from '../services/threads.js';
@@ -411,9 +412,20 @@ export async function runImagePost(maxChars?: number, useLatest = false): Promis
         await waitForPostReady(postId, token);
         console.log('\n💬 正在建立接續留言容器...');
         const replyContainerId = await createReplyContainer(replyText, postId, token);
-        console.log('🚀 正在發布接續留言...');
-        const replyPostId = await publishContainer(replyContainerId, token);
-        console.log(`✅ 接續留言已發布，Reply Post ID：${replyPostId}`);
+        console.log(`   留言容器 ID：${replyContainerId}`);
+
+        const { status, errorMessage } = await getContainerStatus(replyContainerId, token);
+        console.log(`   容器狀態：${status}${errorMessage ? ` — ${errorMessage}` : ''}`);
+
+        if (status === 'PUBLISHED') {
+            console.log(`✅ 接續留言已自動發布，Reply Post ID：${replyContainerId}`);
+        } else if (status === 'FINISHED') {
+            console.log('🚀 正在發布接續留言...');
+            const replyPostId = await publishContainer(replyContainerId, token);
+            console.log(`✅ 接續留言已發布，Reply Post ID：${replyPostId}`);
+        } else {
+            throw new Error(`留言容器狀態異常（${status}）：${errorMessage ?? '未知原因'}`);
+        }
         console.log('   （請點入原始貼文查看串留言，留言不會出現在個人頁列表）');
     }
 
