@@ -8,6 +8,8 @@ import { analyzeAndReply } from './tasks/analyzeReply.js';
 import { runWeeklyReport } from './tasks/weeklyReport.js';
 import { runImagePost } from './tasks/imagePost.js';
 import { runAnalyzeReference } from './tasks/analyzeReference.js';
+import { runReplyTo } from './tasks/replyTo.js';
+import { runEngage } from './tasks/engage.js';
 
 // 從 CLI 參數解析執行模式與選項
 // 範例：tsx src/agent.ts --post
@@ -116,6 +118,40 @@ async function main(): Promise<void> {
             break;
         }
 
+        case '--reply-to': {
+            // 分析指定貼文，若為潛在客戶則直接回覆到 Threads
+            const urlOrId = args[1];
+            if (!urlOrId) {
+                console.error('用法：npm run reply-to "https://www.threads.net/@user/post/XXXXX"');
+                console.error('      npm run reply-to "數字ID"');
+                process.exit(1);
+            }
+            const result = await runReplyTo(urlOrId);
+            if (!result.success) {
+                if (result.skipped) {
+                    console.log('\n⏭️  略過（非潛在客戶貼文）。');
+                } else {
+                    console.error('\n❌ 回覆失敗：', result.error);
+                    process.exit(1);
+                }
+            } else {
+                console.log('\n🎉 回覆發布完成！');
+                console.log(`   Reply Post ID：${result.replyPostId}`);
+            }
+            break;
+        }
+
+        case '--engage': {
+            // 掃描自己近期貼文的留言，找潛在客戶並逐一確認回覆
+            const result = await runEngage();
+            if (!result.success) {
+                console.error('\n❌ Engage 失敗：', result.error);
+                process.exit(1);
+            }
+            console.log(`\n✅ 完成！掃描 ${result.postsScanned} 篇 · 分析 ${result.repliesAnalyzed} 則留言 · 回覆 ${result.replied} 則`);
+            break;
+        }
+
         case '--analyze-reference': {
             // 解析參考貼文庫，AI 提取寫作模式，自動更新 brand.ts / styles.ts
             const result = await runAnalyzeReference();
@@ -141,10 +177,12 @@ GlowPulse Agent — GlowMoment 社群自動化工具
   npm run image-post -- --latest                   使用最新加入的截圖（screenshots.ts 最後一筆）
   npm run image-post -- --max-chars 200            發布 200 字元以內的圖片貼文
   npm run image-post -- --latest --max-chars 200   最新截圖 + 字數限制
-  npm run analyze "貼文內容"                分析貼文並產出回覆建議
-  npm run all                               執行完整每日任務（發文 + 分析）
-  npm run learn                             分析 reference-posts.md，AI 提取寫作模式並更新 data 層
-  npm run report                            產生本週發文成效報告 + AI 改進建議
+  npm run analyze "貼文內容"               分析貼文並產出回覆建議（不發布）
+  npm run reply-to "貼文URL或ID"           分析指定貼文，若為潛在客戶則直接回覆到 Threads
+  npm run engage                           掃描自己近期貼文的留言，逐一回覆潛在客戶
+  npm run all                              執行完整每日任務（發文 + 分析）
+  npm run learn                            分析 reference-posts.md，AI 提取寫作模式並更新 data 層
+  npm run report                           產生本週發文成效報告 + AI 改進建議
 
 選項：
   --max-chars N        限制貼文字數上限為 N 字元；超過時會詢問重新生成或留言接續
@@ -156,6 +194,11 @@ GlowPulse Agent — GlowMoment 社群自動化工具
   --post               依今日日期選定功能與風格，AI 生成貼文後發布到 Threads
   --image-post         隨機選取截圖，AI 分析截圖畫面並生成搭配文案，發布圖片貼文
   --analyze            對指定貼文進行零樣本分類，判斷是否為潛在客戶並產出回覆
+  --reply-to           接受 Threads 貼文 URL 或數字 ID；自動取得貼文內容（公開貼文）
+                       → 零樣本分類 → 生成回覆 → 確認後發布到 Threads
+                       若 API 無法取得貼文內容，會要求手動貼上
+  --engage             取最近 7 天自己貼文的留言 → 分類每則留言 → 找到潛在客戶後
+                       逐一顯示建議回覆，確認後發布；需要帳號有 threads_manage_replies 權限
   --all                依序執行 post 與 analyze（適合排程使用）
   --analyze-reference  讀取 docs/reference-posts.md，AI 提取高流量貼文的寫作模式，
                        自動更新 brand.ts（寫作原則）與 styles.ts（風格指令）

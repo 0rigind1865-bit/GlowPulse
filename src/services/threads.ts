@@ -537,3 +537,132 @@ export async function fetchPostInsights(
         engagementScore: likes * 3 + replies * 4 + reposts * 5 + quotes * 4,
     };
 }
+
+// ─── 外部貼文查詢 ────────────────────────────────────────────────────────────
+
+/**
+ * 將 Threads 貼文 URL 或 shortcode 解析成數字型 media ID
+ *
+ * Threads URL 格式：https://www.threads.net/@username/post/SHORTCODE
+ * Shortcode 是以下 64 字元字母表的 Base64 編碼整數：
+ *   ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_
+ *
+ * @param input - 接受三種格式：
+ *   1. 完整 URL（https://www.threads.net/@user/post/XXXXX）
+ *   2. 純 shortcode（英數字與 -_）
+ *   3. 純數字 ID（直接回傳）
+ */
+export function parseThreadsPostId(input: string): string {
+    const trimmed = input.trim();
+
+    // 已經是數字 ID，直接回傳
+    if (/^\d+$/.test(trimmed)) return trimmed;
+
+    // 從 URL 取出 shortcode
+    const urlMatch = trimmed.match(/\/post\/([A-Za-z0-9_-]+)/);
+    const shortcode = urlMatch ? urlMatch[1] : trimmed;
+
+    // 確認是有效的 shortcode 格式（長度 8+ 且只含 Base64URL 字元）
+    if (!/^[A-Za-z0-9_-]{8,}$/.test(shortcode)) {
+        throw new Error(
+            `無法解析：「${input}」\n` +
+            `請提供 Threads 貼文 URL（如 https://www.threads.net/@user/post/XXXXX）或數字 ID。`,
+        );
+    }
+
+    // Base64URL → 數字 ID（使用 BigInt 避免 JS 整數精度問題）
+    const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    let n = 0n;
+    for (const ch of shortcode) {
+        const idx = ALPHA.indexOf(ch);
+        if (idx === -1) throw new Error(`shortcode 含無效字元：${ch}`);
+        n = n * 64n + BigInt(idx);
+    }
+    return n.toString();
+}
+
+/**
+ * 單則外部（或自己的）貼文資訊
+ * 由 getPost() 回傳，包含作者帳號名稱
+ */
+export type ThreadsPostDetail = {
+    id: string;
+    text: string;
+    username: string;
+    timestamp: string;
+};
+
+/**
+ * 取得指定貼文的內容與作者資訊
+ *
+ * 注意：讀取他人貼文需要貼文為公開狀態；
+ * 若 API 回傳 403 / 100，表示沒有讀取權限（貼文不公開或需要進階 scope）。
+ *
+ * @param postId - Threads media ID（數字字串）
+ * @param token  - Access Token
+ */
+export async function getPost(postId: string, token: string): Promise<ThreadsPostDetail> {
+    const url = new URL(`${THREADS_API_BASE}/${postId}`);
+    url.searchParams.set('fields', 'id,text,username,timestamp');
+    url.searchParams.set('access_token', token);
+
+    const res = await fetch(url.toString());
+    const data: unknown = await res.json().catch(() => null);
+
+    if (!res.ok) throw new Error(parseError(data, `取得貼文失敗：${res.status}`));
+
+    const d = data as Partial<ThreadsPostDetail>;
+    if (!d.id) throw new Error('API 回應缺少貼文 id 欄位。');
+    return {
+        id: d.id,
+        text: d.text ?? '',
+        username: d.username ?? '（未知）',
+        timestamp: d.timestamp ?? '',
+    };
+}
+
+/**
+ * 單則留言（貼文下的直接回覆）
+ */
+export type ThreadsReply = {
+    id: string;
+    text: string;
+    username: string;
+    timestamp: string;
+};
+
+/**
+ * 取得指定貼文的直接留言列表
+ *
+ * 需要帳號擁有 threads_manage_replies 或 threads_read_replies 權限。
+ * 只取第一頁（最多 25 則）；高互動貼文可能需要分頁（目前未實作）。
+ *
+ * @param postId - 要查詢留言的貼文 ID
+ * @param token  - Access Token
+ * @returns 留言陣列；若該貼文無留言或無權限則回傳空陣列
+ */
+export async function getPostReplies(postId: string, token: string): Promise<ThreadsReply[]> {
+    const url = new URL(`${THREADS_API_BASE}/${postId}/replies`);
+    url.searchParams.set('fields', 'id,text,username,timestamp');
+    url.searchParams.set('access_token', token);
+
+    const res = await fetch(url.toString());
+    const data: unknown = await res.json().catch(() => null);
+
+    if (!res.ok) {
+        // 沒有讀取留言的權限時，靜默回傳空陣列（不中止整個 engage 流程）
+        console.warn(`   ⚠️  無法取得貼文 ${postId} 的留言（${res.status}），略過。`);
+        return [];
+    }
+
+    type RepliesResponse = { data?: Array<Partial<ThreadsReply>> };
+    const items = (data as RepliesResponse).data ?? [];
+    return items
+        .filter(r => r.id && r.text && r.text.trim().length > 0)
+        .map(r => ({
+            id: r.id!,
+            text: r.text!,
+            username: r.username ?? '（未知）',
+            timestamp: r.timestamp ?? '',
+        }));
+}
