@@ -288,6 +288,47 @@ export function splitForThread(
 }
 
 /**
+ * 輪詢 Threads API，等待指定貼文可被查詢（確認 Threads 後端已完成處理）
+ *
+ * Threads 採非同步後端處理：publishContainer() 回傳 postId 後，
+ * 系統可能尚未將貼文完整寫入索引。若此時建立 reply_to_id 指向該貼文的容器，
+ * Threads 驗證失敗會刪除 reply container，導致後續 publishContainer 找不到。
+ *
+ * 每秒輪詢一次，最多等 maxWaitMs（預設 30 秒），超時後不拋錯（靜默繼續）。
+ *
+ * @param postId    - 要確認存在的已發布貼文 ID
+ * @param token     - 有效的 Access Token
+ * @param maxWaitMs - 最長等待毫秒數（預設 30000）
+ */
+export async function waitForPostReady(
+    postId: string,
+    token: string,
+    maxWaitMs = 30_000,
+): Promise<void> {
+    const started = Date.now();
+    const pollInterval = 1500;
+
+    while (Date.now() - started < maxWaitMs) {
+        try {
+            const url = new URL(`${THREADS_API_BASE}/${postId}`);
+            url.searchParams.set('fields', 'id');
+            url.searchParams.set('access_token', token);
+            const res = await fetch(url.toString());
+            if (res.ok) {
+                const data = await res.json().catch(() => null);
+                if ((data as { id?: string })?.id) return; // 貼文已可查詢
+            }
+        } catch {
+            // 網路暫時失敗，繼續輪詢
+        }
+        process.stdout.write('.');
+        await new Promise(r => setTimeout(r, pollInterval));
+    }
+    // 超時後靜默繼續，讓後續步驟嘗試
+    process.stdout.write('\n');
+}
+
+/**
  * 建立 Threads 留言容器（回覆到指定貼文下方）
  *
  * 與 createContainer 差異：加入 reply_to_id 指定目標貼文

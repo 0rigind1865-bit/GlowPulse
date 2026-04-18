@@ -12,6 +12,7 @@ import {
     createContainer,
     createReplyContainer,
     publishContainer,
+    waitForPostReady,
 } from '../services/threads.js';
 
 export type AutoPostResult =
@@ -123,17 +124,16 @@ export async function runAutoPost(maxChars?: number): Promise<AutoPostResult> {
 
     // 發布接續留言（若有）
     if (replyText) {
-        // 等待主貼文在 Threads 伺服器端完全處理完畢，再建立回覆容器
-        console.log('\n⏳ 等待主貼文處理完成（3 秒）...');
-        await new Promise(r => setTimeout(r, 3000));
+        // 輪詢等待主貼文在 Threads 系統中完全可查詢後，再建立 reply container
+        // 若太早建立，Threads 驗證 reply_to_id 失敗會刪除容器，導致後續 publish 找不到
+        console.log('\n⏳ 等待主貼文在 Threads 完成處理...');
+        await waitForPostReady(postId, token);
         console.log('\n💬 正在建立接續留言容器...');
-        console.log(`   reply_to_id：${postId}`);
         const replyContainerId = await createReplyContainer(replyText, postId, token);
-        console.log(`   留言容器 ID：${replyContainerId}`);
         console.log('🚀 正在發布接續留言...');
         const replyPostId = await publishContainer(replyContainerId, token);
         console.log(`✅ 接續留言已發布，Reply Post ID：${replyPostId}`);
-        console.log('   （留言不會出現在個人頁，請點入原始貼文查看串留言）');
+        console.log('   （請點入原始貼文查看串留言，留言不會出現在個人頁列表）');
     }
 
     return { success: true, postId, content, feature: feature.name, style: style.name };
