@@ -25,4 +25,10 @@ export const SCREENSHOTS: Screenshot[] = [
         featureName: '客戶預約詳情確認與行動',
         description: '此SaaS產品截圖顯示一筆服務預約的確認頁面。上方為服務提供者Glow，預約服務名稱為「諮詢」，來自Moonni Beauty Studio。顯示已確認的服務地址、2026年4月30日週四07:00-08:00的預約日期與時間。費用為新台幣100元，無需訂金。使用者可選擇「加入 Google 行事曆」或「再次預約」。',
     },
+    {
+        filename: '截圖 2026-04-18 晚上8.14.31.png',
+        githubUrl: 'https://raw.githubusercontent.com/0rigind1865-bit/GlowPulse/main/assets/screenshots/截圖 2026-04-18 晚上8.14.31.png',
+        featureName: '每週營業時段彈性設定與管理',
+        description: '此SaaS產品截圖為設定「每週預設時段」的介面。畫面列出週日到週六的項目，每個含一個啟用開關。已啟用（粉紅色）的週一至週四顯示可調整的預約起迄時間，例如週一為上午9點至下午6點。未啟用（灰色）的週日、週五、週六則顯示「本日公休 / 不開放預約」。使用者可透過開關啟用或禁用特定日期的預約，並調整其開放時段。',
+    },
 ];
