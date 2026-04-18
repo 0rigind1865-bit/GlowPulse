@@ -16,13 +16,13 @@ export const SCREENSHOTS: Screenshot[] = [
     {
         filename: 'service-setup.png',
         githubUrl: 'https://raw.githubusercontent.com/0rigind1865-bit/GlowPulse/main/assets/screenshots/service-setup.png',
-        featureName: '已確認預約詳情',
-        description: '此SaaS產品截圖顯示預約確認畫面。上方標示服務提供者「Glow」及「已確認」狀態。左側有服務圖片與「諮詢」名稱。右側列出地址、2026年4月30日週四的日期，以及07:00-08:00的時間。下方顯示NT$100費用（不需訂金），並提供「加入 Google 行事曆」和「再次預約」操作按鈕。',
+        featureName: '專業服務項目彈性設定與管理',
+        description: '此SaaS產品截圖顯示服務項目編輯頁面。上方為手機狀態列。核心介面包含可編輯的「服務名稱」（法式手繪美甲）、品牌圖片「Mooni BEAUTY STUDIO」，以及設定「所需時間」（1 小時）、「服務總價」（3000）與「應付訂金」（500）等欄位。使用者可點擊刪除圖示、下方「新增項目」或「儲存服務項目」按鈕進行操作。',
     },
     {
         filename: '2.png',
         githubUrl: 'https://raw.githubusercontent.com/0rigind1865-bit/GlowPulse/main/assets/screenshots/2.png',
-        featureName: '',
-        description: '',
+        featureName: '客戶預約詳情確認與行動',
+        description: '此SaaS產品截圖顯示一筆服務預約的確認頁面。上方為服務提供者Glow，預約服務名稱為「諮詢」，來自Moonni Beauty Studio。顯示已確認的服務地址、2026年4月30日週四07:00-08:00的預約日期與時間。費用為新台幣100元，無需訂金。使用者可選擇「加入 Google 行事曆」或「再次預約」。',
     },
 ];
