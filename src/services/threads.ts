@@ -533,9 +533,29 @@ export async function fetchPostInsights(
         replies,
         reposts,
         quotes,
-        // 加權分數：回覆/轉發/引用比按讚更代表讀者真實被打動的程度
-        engagementScore: likes * 3 + replies * 4 + reposts * 5 + quotes * 4,
+        // 加權分數：以轉發（×5）和引用（×4）為主要訊號，兩者難以自行刷高
+        // replies 不計入：bot 自動回覆留言會計入此數字，造成分數虛高
+        // views 不計入：曝光量龐大會稀釋真實互動的比例差異
+        engagementScore: likes * 3 + reposts * 5 + quotes * 4,
     };
+}
+
+/**
+ * 取得自己帳號的基本資料（id 與 username）
+ * 用於 engage 過濾自己的留言，避免 bot 重複回覆自己的回應
+ */
+export async function getMyProfile(token: string): Promise<{ id: string; username: string }> {
+    const url = new URL(`${THREADS_API_BASE}/me`);
+    url.searchParams.set('fields', 'id,username');
+    url.searchParams.set('access_token', token);
+
+    const res = await fetch(url.toString());
+    const data: unknown = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(parseError(data, `取得帳號資料失敗：${res.status}`));
+
+    const d = data as { id?: string; username?: string };
+    if (!d.id || !d.username) throw new Error('API 回應缺少 id 或 username 欄位。');
+    return { id: d.id, username: d.username };
 }
 
 // ─── 外部貼文查詢 ────────────────────────────────────────────────────────────

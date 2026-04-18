@@ -9,6 +9,7 @@ import {
     getUsableToken,
     fetchMyPosts,
     getPostReplies,
+    getMyProfile,
     createReplyContainer,
     waitForContainerReady,
     publishContainer,
@@ -63,6 +64,10 @@ export async function runEngage(scanDays = SCAN_DAYS): Promise<EngageResult> {
     console.log(`\n🔑 讀取 Threads Access Token...`);
     const token = await getUsableToken();
 
+    // 取得自己的 username，用於過濾留言中自己的回覆
+    const { username: myUsername } = await getMyProfile(token);
+    console.log(`   帳號：@${myUsername}`);
+
     // ── 步驟 1：取得近期自己的貼文 ──────────────────────────────────────────
     const since = new Date(Date.now() - scanDays * 86_400_000).toISOString();
     console.log(`\n📋 掃描最近 ${scanDays} 天的貼文（${since.slice(0, 10)} 之後）...`);
@@ -82,9 +87,16 @@ export async function runEngage(scanDays = SCAN_DAYS): Promise<EngageResult> {
         const preview = post.text.slice(0, 30).replace(/\n/g, ' ');
         process.stdout.write(`   📝 「${preview}…」 — 取得留言中...`);
         const replies = await getPostReplies(post.id, token);
-        process.stdout.write(` ${replies.length} 則\n`);
+        process.stdout.write(` ${replies.length} 則`);
 
-        for (const reply of replies) {
+        // 過濾自己的留言：跳過 bot 之前已經發出的回覆，避免無限重複回應
+        const othersReplies = replies.filter(r => r.username !== myUsername);
+        if (replies.length !== othersReplies.length) {
+            process.stdout.write(` （過濾掉 ${replies.length - othersReplies.length} 則自己的回覆）`);
+        }
+        process.stdout.write('\n');
+
+        for (const reply of othersReplies) {
             totalAnalyzed++;
             const classification = await callZeroShot(reply.text, [...CANDIDATE_LABELS]);
             const topLabel = classification[0]?.label ?? '';
