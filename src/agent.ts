@@ -32,6 +32,7 @@ function parseMaxChars(): number | undefined {
 }
 
 const maxChars = parseMaxChars();
+const useLatest = args.includes('--latest');
 
 async function main(): Promise<void> {
     switch (mode) {
@@ -104,7 +105,7 @@ async function main(): Promise<void> {
 
         case '--image-post': {
             // 讀取截圖 → AI 生成畫面描述與文案 → 發布圖片貼文
-            const result = await runImagePost(maxChars);
+            const result = await runImagePost(maxChars, useLatest);
             if (!result.success) {
                 console.error('\n❌ 圖片發文失敗：', result.error);
                 process.exit(1);
@@ -136,8 +137,10 @@ GlowPulse Agent — GlowMoment 社群自動化工具
 用法：
   npm run post                              自動生成並發布今日宣傳貼文
   npm run post -- --max-chars 150          發布 150 字元以內的短貼文
-  npm run image-post                        讀取截圖，AI 生成描述與文案後發布圖片貼文
-  npm run image-post -- --max-chars 200    發布 200 字元以內的圖片貼文
+  npm run image-post                               讀取截圖，AI 生成描述與文案後發布圖片貼文
+  npm run image-post -- --latest                   使用最新加入的截圖（screenshots.ts 最後一筆）
+  npm run image-post -- --max-chars 200            發布 200 字元以內的圖片貼文
+  npm run image-post -- --latest --max-chars 200   最新截圖 + 字數限制
   npm run analyze "貼文內容"                分析貼文並產出回覆建議
   npm run all                               執行完整每日任務（發文 + 分析）
   npm run learn                             分析 reference-posts.md，AI 提取寫作模式並更新 data 層
@@ -146,6 +149,8 @@ GlowPulse Agent — GlowMoment 社群自動化工具
 選項：
   --max-chars N        限制貼文字數上限為 N 字元；超過時會詢問重新生成或留言接續
                        適用於 --post 與 --image-post
+  --latest             使用 screenshots.ts 最後一筆截圖（最新加入的）
+                       適用於 --image-post
 
 模式說明：
   --post               依今日日期選定功能與風格，AI 生成貼文後發布到 Threads

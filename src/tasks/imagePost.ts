@@ -30,9 +30,11 @@ const FEATURES_DATA_PATH = new URL('../data/features.ts', import.meta.url);
  * 依今年第幾天從截圖清單中輪替選出今日截圖與對應風格
  * 與 autoPost 共用相同的日期輪替邏輯，確保可重現
  */
-function getTodaysConfig(): { screenshot: Screenshot; style: PostStyle } {
+function getTodaysConfig(useLatest = false): { screenshot: Screenshot; style: PostStyle } {
     return {
-        screenshot: SCREENSHOTS[Math.floor(Math.random() * SCREENSHOTS.length)],
+        screenshot: useLatest
+            ? SCREENSHOTS[SCREENSHOTS.length - 1]           // 最新加入的截圖（陣列最後一筆）
+            : SCREENSHOTS[Math.floor(Math.random() * SCREENSHOTS.length)],
         style: POST_STYLES[Math.floor(Math.random() * POST_STYLES.length)],
     };
 }
@@ -260,7 +262,7 @@ function escapeRegExp(text: string): string {
  *   3. 結合描述 + 功能資訊 → AI 生成貼文文案
  *   4. 刷新 Token → 建立圖片容器（使用 GitHub raw URL）→ 發布
  */
-export async function runImagePost(maxChars?: number): Promise<ImagePostResult> {
+export async function runImagePost(maxChars?: number, useLatest = false): Promise<ImagePostResult> {
     if (SCREENSHOTS.length === 0) {
         return {
             success: false,
@@ -268,7 +270,10 @@ export async function runImagePost(maxChars?: number): Promise<ImagePostResult> 
         };
     }
 
-    const { screenshot, style } = getTodaysConfig();
+    const { screenshot, style } = getTodaysConfig(useLatest);
+    if (useLatest) {
+        console.log('🆕 使用最新截圖（--latest）');
+    }
     let workingScreenshot = screenshot;
 
     console.log(`🖼️  今日截圖：${screenshot.filename}`);
