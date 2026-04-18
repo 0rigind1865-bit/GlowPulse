@@ -46,7 +46,7 @@ export async function describeImageWithGemini(imageUrl: string): Promise<string>
     const { data, mimeType } = await fetchImageAsBase64(imageUrl);
 
     // 從 models.ts 讀取候選清單，依序嘗試至第一個成功為止
-    const modelCandidates = MODELS.visionCandidates;
+    const modelCandidates = MODELS.gemini.visionCandidates;
 
     for (const modelName of modelCandidates) {
         try {

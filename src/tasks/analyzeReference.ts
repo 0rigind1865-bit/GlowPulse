@@ -229,7 +229,7 @@ async function analyzeWithAI(posts: ReferencePost[]): Promise<string> {
                 console.warn('   充值：https://console.anthropic.com/settings/billing');
             }
             return callChatCompletion(
-                MODELS.hfAnalysis,
+                MODELS.hf.analysisBackup,
                 [{ role: 'user', content: `請全程使用繁體中文回應，嚴禁使用簡體中文。\n\n${prompt}` }],
                 0.5,
                 2000,

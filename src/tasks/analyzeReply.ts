@@ -27,7 +27,7 @@ export async function analyzeAndReply(postContent: string): Promise<string | nul
 
     // 步驟 B：對潛在客戶貼文生成親切自然的品牌回覆
     return callChatCompletion(
-        MODELS.intentAnalysis,
+        MODELS.hf.intentReply,
         [
             { role: 'system', content: BRAND_CONTEXT },
             {

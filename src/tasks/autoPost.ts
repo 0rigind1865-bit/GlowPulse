@@ -41,7 +41,7 @@ async function generateContent(feature: Feature, style: PostStyle): Promise<stri
         `請依照以上資訊，寫出一則 Threads 貼文。只輸出貼文本身，不要加任何前言或說明。`,
     ].join('\n');
 
-    return callChatCompletion(MODELS.textGeneration, [
+    return callChatCompletion(MODELS.hf.textGeneration, [
         { role: 'system', content: BRAND_CONTEXT },
         { role: 'user', content: userPrompt },
     ]);

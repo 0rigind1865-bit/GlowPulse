@@ -77,7 +77,7 @@ async function generateCaption(
         `只輸出貼文本身，不要加任何前言或說明。`,
     ].join('\n');
 
-    return callChatCompletion(MODELS.textGeneration, [
+    return callChatCompletion(MODELS.hf.textGeneration, [
         { role: 'system', content: BRAND_CONTEXT },
         { role: 'user', content: userPrompt },
     ]);
@@ -108,7 +108,7 @@ async function analyzeVisualDescription(
         `不要輸出其他內容。`,
     ].join('\n');
 
-    return callChatCompletion(MODELS.visualAnalysis, [
+    return callChatCompletion(MODELS.hf.visualAnalysis, [
         { role: 'system', content: '你是精準的產品畫面分析助理。只輸出繁體中文。' },
         { role: 'user', content: prompt },
     ], 0.2, 220);
@@ -130,7 +130,7 @@ async function generateFeatureFromDescription(visualDesc: string): Promise<Featu
         visualDesc,
     ].join('\n');
 
-    const raw = await callChatCompletion(MODELS.visualAnalysis, [
+    const raw = await callChatCompletion(MODELS.hf.visualAnalysis, [
         { role: 'system', content: '你是產品功能規劃助手。必須回傳合法 JSON，不可輸出多餘文字。' },
         { role: 'user', content: prompt },
     ], 0.2, 320);

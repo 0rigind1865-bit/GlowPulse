@@ -47,7 +47,7 @@ export async function callClaude(
     system: string,
     userPrompt: string,
     maxTokens = 2000,
-    model = MODELS.claudeAnalysis,
+    model = MODELS.claude.analysis,
 ): Promise<string> {
     const client = getClient();
 
