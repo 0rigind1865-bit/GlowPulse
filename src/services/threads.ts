@@ -368,6 +368,38 @@ export async function getContainerStatus(
     };
 }
 
+/**
+ * 輪詢 container 狀態，等到 FINISHED 或 PUBLISHED 後回傳最終狀態
+ *
+ * IN_PROGRESS 是正常的中間狀態（圖片上傳 / reply 驗證都會經過），
+ * 需要持續輪詢直到終態才能進行下一步。
+ *
+ * @param containerId - 要等待的容器 ID
+ * @param token       - 有效的 Access Token
+ * @param maxWaitMs   - 最長等待毫秒數（預設 30000）
+ * @returns 最終狀態字串；超時仍回傳最後一次查到的狀態
+ */
+export async function waitForContainerReady(
+    containerId: string,
+    token: string,
+    maxWaitMs = 30_000,
+): Promise<{ status: string; errorMessage?: string }> {
+    const started = Date.now();
+    const pollInterval = 1500;
+    let last: { status: string; errorMessage?: string } = { status: 'IN_PROGRESS' };
+
+    while (Date.now() - started < maxWaitMs) {
+        last = await getContainerStatus(containerId, token);
+        if (last.status === 'FINISHED' || last.status === 'PUBLISHED' || last.status === 'ERROR') {
+            return last;
+        }
+        process.stdout.write('.');
+        await new Promise(r => setTimeout(r, pollInterval));
+    }
+    process.stdout.write('\n');
+    return last; // 超時，回傳最後狀態讓呼叫端決定
+}
+
 export async function createReplyContainer(
     text: string,
     replyToId: string,

@@ -11,7 +11,7 @@ import {
     getUsableToken,
     createContainer,
     createReplyContainer,
-    getContainerStatus,
+    waitForContainerReady,
     publishContainer,
     waitForPostReady,
 } from '../services/threads.js';
@@ -132,8 +132,8 @@ export async function runAutoPost(maxChars?: number): Promise<AutoPostResult> {
         const replyContainerId = await createReplyContainer(replyText, postId, token);
         console.log(`   留言容器 ID：${replyContainerId}`);
 
-        // 查詢 container 狀態：TEXT reply 有時會跳過 staging 直接進入 PUBLISHED
-        const { status, errorMessage } = await getContainerStatus(replyContainerId, token);
+        // 輪詢等待 reply container 進入終態（IN_PROGRESS → FINISHED 或 PUBLISHED）
+        const { status, errorMessage } = await waitForContainerReady(replyContainerId, token);
         console.log(`   容器狀態：${status}${errorMessage ? ` — ${errorMessage}` : ''}`);
 
         if (status === 'PUBLISHED') {

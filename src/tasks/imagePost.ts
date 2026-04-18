@@ -14,7 +14,7 @@ import {
     getUsableToken,
     createImageContainer,
     createReplyContainer,
-    getContainerStatus,
+    waitForContainerReady,
     publishContainer,
     waitForPostReady,
 } from '../services/threads.js';
@@ -414,7 +414,7 @@ export async function runImagePost(maxChars?: number, useLatest = false): Promis
         const replyContainerId = await createReplyContainer(replyText, postId, token);
         console.log(`   留言容器 ID：${replyContainerId}`);
 
-        const { status, errorMessage } = await getContainerStatus(replyContainerId, token);
+        const { status, errorMessage } = await waitForContainerReady(replyContainerId, token);
         console.log(`   容器狀態：${status}${errorMessage ? ` — ${errorMessage}` : ''}`);
 
         if (status === 'PUBLISHED') {
