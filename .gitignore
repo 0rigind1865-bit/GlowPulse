@@ -4,9 +4,6 @@
 # Claude Code 本機權限設定（每台機器不同，不需要同步）
 .claude/settings.local.json
 
-# 自動產生的週報（內容隨時間變化，不需要版本控制）
-docs/reports/
-
 # Node.js 依賴
 node_modules/
 
