@@ -35,12 +35,17 @@ function getTodaysConfig(): { feature: Feature; style: PostStyle } {
 
 /**
  * @param forceShorter - true 時在 prompt 加入嚴格字數要求，用於使用者選擇重新生成時
+ * @param maxChars     - 使用者指定的字數上限；有值時加入 prompt 作為硬性限制
  */
 async function generateContent(
     feature: Feature,
     style: PostStyle,
     forceShorter = false,
+    maxChars?: number,
 ): Promise<string> {
+    // 字數限制：優先用使用者指定值，其次是 forceShorter 的保守值（450）
+    const charLimit = maxChars ?? (forceShorter ? 450 : null);
+
     const userPrompt = [
         `今天要介紹的功能：「${feature.name}」`,
         ``,
@@ -50,8 +55,8 @@ async function generateContent(
         ``,
         `發文風格要求：${style.instruction}`,
         ``,
-        forceShorter
-            ? `重要限制：全文（含 hashtag）必須嚴格控制在 450 字元以內，這是硬性要求。`
+        charLimit !== null
+            ? `重要限制：全文（含 hashtag）必須嚴格控制在 ${charLimit} 字元以內，這是硬性要求。`
             : '',
         `請依照以上資訊，寫出一則 Threads 貼文。只輸出貼文本身，不要加任何前言或說明。`,
     ].filter(Boolean).join('\n');
@@ -61,9 +66,11 @@ async function generateContent(
 
 /**
  * 完整的自動發文流程：取得可用 Token → 生成內容 → 處理超限 → 建立容器 → 發布
- * 若內容超過 Threads 500 字元限制，會詢問使用者選擇重新生成或以留言接續
+ *
+ * @param maxChars - 可選的字元上限（例如：200 表示只想發短文）；
+ *                   超過此值時觸發 overflow 詢問；預設為 Threads API 上限（500）
  */
-export async function runAutoPost(): Promise<AutoPostResult> {
+export async function runAutoPost(maxChars?: number): Promise<AutoPostResult> {
     const { feature, style } = getTodaysConfig();
 
     console.log(`📌 今日功能：${feature.name}`);
@@ -72,11 +79,18 @@ export async function runAutoPost(): Promise<AutoPostResult> {
     console.log('\n🔑 讀取 Threads Access Token...');
     const token = await getUsableToken();
 
+    if (maxChars) {
+        console.log(`📏 字數限制：${maxChars} 字元以內`);
+    }
     console.log('\n🤖 正在生成貼文內容...');
-    let draft = await generateContent(feature, style);
+    let draft = await generateContent(feature, style, false, maxChars);
 
-    // 超限處理：讓使用者選擇重新生成或分割留言
-    const overflow = await handleOverflow(draft, () => generateContent(feature, style, true));
+    // 超限處理：使用者指定 maxChars 時以該值為閾值，否則用 Threads API 上限（500）
+    const overflow = await handleOverflow(
+        draft,
+        () => generateContent(feature, style, true, maxChars),
+        maxChars,
+    );
     if (!overflow) {
         return { success: false, error: '已取消發布。' };
     }

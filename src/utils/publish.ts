@@ -11,7 +11,7 @@ export type OverflowResult = {
 };
 
 /**
- * 偵測貼文是否超過 Threads 字元限制，若超過則詢問使用者處理方式：
+ * 偵測貼文是否超過字元上限，若超過則詢問使用者處理方式：
  *   [1] 重新生成較短版本 — 呼叫 regenerateFn() 後重新檢查
  *   [2] 以第一則留言接續 — 在自然斷點切分，overflow 部分作為留言發布
  *   [3] 取消
@@ -21,17 +21,24 @@ export type OverflowResult = {
  *
  * @param text          - 待檢查的完整文字
  * @param regenerateFn  - 使用者選擇重新生成時呼叫的函式（應加入更嚴格的字數限制）
+ * @param maxChars      - 字元上限，預設為 Threads API 限制（500）；
+ *                        傳入更小的值可讓使用者偏好的字數也觸發 overflow 詢問
  */
 export async function handleOverflow(
     text: string,
     regenerateFn: () => Promise<string>,
+    maxChars = THREADS_MAX_TEXT_LENGTH,
 ): Promise<OverflowResult | null> {
-    if (text.length <= THREADS_MAX_TEXT_LENGTH) {
+    if (text.length <= maxChars) {
         return { main: text, reply: null };
     }
 
+    const limitLabel = maxChars < THREADS_MAX_TEXT_LENGTH
+        ? `你指定的 ${maxChars} 字元上限`
+        : `Threads ${THREADS_MAX_TEXT_LENGTH} 字元限制`;
+
     console.log(
-        `\n⚠️  生成的內容超過 Threads ${THREADS_MAX_TEXT_LENGTH} 字元限制` +
+        `\n⚠️  生成的內容超過${limitLabel}` +
         `（目前 ${text.length} 字元）`,
     );
 
@@ -44,16 +51,18 @@ export async function handleOverflow(
     if (choice === 1) {
         console.log('\n🔄 重新生成較短版本...');
         const newText = await regenerateFn();
-        if (newText.length > THREADS_MAX_TEXT_LENGTH) {
+        if (newText.length > maxChars) {
             // 重新生成後仍超限，遞迴再問一次
             console.log(`   生成後仍有 ${newText.length} 字元，超過限制`);
-            return handleOverflow(newText, regenerateFn);
+            return handleOverflow(newText, regenerateFn, maxChars);
         }
         return { main: newText, reply: null };
     }
 
     if (choice === 2) {
-        const [main, reply] = splitForThread(text);
+        // 分割時以 Threads API 上限（500）為分割點，而非使用者偏好的 maxChars
+        const splitAt = Math.min(maxChars, THREADS_MAX_TEXT_LENGTH);
+        const [main, reply] = splitForThread(text, splitAt);
         console.log(
             `\n✂️  已在自然斷點分割：主貼文 ${main.length} 字元 ／` +
             ` 接續留言 ${reply.length} 字元`,

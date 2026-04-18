@@ -9,17 +9,35 @@ import { runWeeklyReport } from './tasks/weeklyReport.js';
 import { runImagePost } from './tasks/imagePost.js';
 import { runAnalyzeReference } from './tasks/analyzeReference.js';
 
-// 從 CLI 參數解析執行模式
-// 範例：ts-node --esm src/agent.ts --post
-//        ts-node --esm src/agent.ts --analyze "貼文內容"
+// 從 CLI 參數解析執行模式與選項
+// 範例：tsx src/agent.ts --post
+//        tsx src/agent.ts --post --max-chars 200
+//        tsx src/agent.ts --analyze "貼文內容"
 const args = process.argv.slice(2);
 const mode = args[0];
+
+/**
+ * 解析 --max-chars N 參數
+ * 找不到或值非正整數時回傳 undefined（使用預設行為）
+ */
+function parseMaxChars(): number | undefined {
+    const idx = args.indexOf('--max-chars');
+    if (idx === -1) return undefined;
+    const val = parseInt(args[idx + 1] ?? '', 10);
+    if (!Number.isFinite(val) || val <= 0) {
+        console.warn('⚠️  --max-chars 需要一個正整數，已忽略此參數。');
+        return undefined;
+    }
+    return val;
+}
+
+const maxChars = parseMaxChars();
 
 async function main(): Promise<void> {
     switch (mode) {
         case '--post': {
             // 自動生成並發布今日 GlowMoment 宣傳貼文
-            const result = await runAutoPost();
+            const result = await runAutoPost(maxChars);
             if (!result.success) {
                 console.error('\n❌ 發文失敗：', result.error);
                 process.exit(1);
@@ -86,7 +104,7 @@ async function main(): Promise<void> {
 
         case '--image-post': {
             // 讀取截圖 → AI 生成畫面描述與文案 → 發布圖片貼文
-            const result = await runImagePost();
+            const result = await runImagePost(maxChars);
             if (!result.success) {
                 console.error('\n❌ 圖片發文失敗：', result.error);
                 process.exit(1);
@@ -116,16 +134,22 @@ async function main(): Promise<void> {
 GlowPulse Agent — GlowMoment 社群自動化工具
 
 用法：
-  npm run post                         自動生成並發布今日宣傳貼文
-  npm run image-post                   讀取截圖，AI 生成描述與文案後發布圖片貼文
-  npm run analyze "貼文內容"            分析貼文並產出回覆建議
-  npm run all                          執行完整每日任務（發文 + 分析）
-  npm run learn                        分析 reference-posts.md，AI 提取寫作模式並更新 data 層
-  npm run report                       產生本週發文成效報告 + AI 改進建議
+  npm run post                              自動生成並發布今日宣傳貼文
+  npm run post -- --max-chars 150          發布 150 字元以內的短貼文
+  npm run image-post                        讀取截圖，AI 生成描述與文案後發布圖片貼文
+  npm run image-post -- --max-chars 200    發布 200 字元以內的圖片貼文
+  npm run analyze "貼文內容"                分析貼文並產出回覆建議
+  npm run all                               執行完整每日任務（發文 + 分析）
+  npm run learn                             分析 reference-posts.md，AI 提取寫作模式並更新 data 層
+  npm run report                            產生本週發文成效報告 + AI 改進建議
+
+選項：
+  --max-chars N        限制貼文字數上限為 N 字元；超過時會詢問重新生成或留言接續
+                       適用於 --post 與 --image-post
 
 模式說明：
   --post               依今日日期選定功能與風格，AI 生成貼文後發布到 Threads
-  --image-post         依今日日期選定截圖，AI 分析截圖畫面並生成搭配文案，發布圖片貼文
+  --image-post         隨機選取截圖，AI 分析截圖畫面並生成搭配文案，發布圖片貼文
   --analyze            對指定貼文進行零樣本分類，判斷是否為潛在客戶並產出回覆
   --all                依序執行 post 與 analyze（適合排程使用）
   --analyze-reference  讀取 docs/reference-posts.md，AI 提取高流量貼文的寫作模式，

@@ -49,6 +49,7 @@ async function generateCaption(
     screenshot: Screenshot,
     style: PostStyle,
     forceShorter = false,
+    maxChars?: number,
 ): Promise<string> {
     // 從 features.ts 找出與截圖對應的功能資訊
     const feature = GLOWMOMENT_FEATURES.find(f => f.name === screenshot.featureName);
@@ -76,9 +77,12 @@ async function generateCaption(
         ``,
         `請根據截圖內容與功能資訊，寫出一則適合搭配這張圖片的 Threads 貼文說明文字。`,
         `文字要能讓沒看過圖片的人也能理解產品價值，看過圖片的人更能產生共鳴。`,
-        forceShorter
-            ? `重要限制：全文（含 hashtag）必須嚴格控制在 450 字元以內，這是硬性要求。`
-            : '',
+        (() => {
+            const charLimit = maxChars ?? (forceShorter ? 450 : null);
+            return charLimit !== null
+                ? `重要限制：全文（含 hashtag）必須嚴格控制在 ${charLimit} 字元以內，這是硬性要求。`
+                : '';
+        })(),
         `只輸出貼文本身，不要加任何前言或說明。`,
     ].filter(Boolean).join('\n');
 
@@ -256,7 +260,7 @@ function escapeRegExp(text: string): string {
  *   3. 結合描述 + 功能資訊 → AI 生成貼文文案
  *   4. 刷新 Token → 建立圖片容器（使用 GitHub raw URL）→ 發布
  */
-export async function runImagePost(): Promise<ImagePostResult> {
+export async function runImagePost(maxChars?: number): Promise<ImagePostResult> {
     if (SCREENSHOTS.length === 0) {
         return {
             success: false,
@@ -328,13 +332,17 @@ export async function runImagePost(): Promise<ImagePostResult> {
     console.log('─'.repeat(40));
 
     // 步驟二：文案生成（先分析截圖描述，再生成貼文）
+    if (maxChars) {
+        console.log(`📏 字數限制：${maxChars} 字元以內`);
+    }
     console.log('\n🤖 正在生成圖片搭配文案...');
-    const draft = await generateCaption(visualDesc, workingScreenshot, style);
+    const draft = await generateCaption(visualDesc, workingScreenshot, style, false, maxChars);
 
-    // 超限處理：詢問使用者重新生成或以留言接續
+    // 超限處理：使用者指定 maxChars 時以該值為閾值，否則用 Threads API 上限（500）
     const overflow = await handleOverflow(
         draft,
-        () => generateCaption(visualDesc, workingScreenshot, style, true),
+        () => generateCaption(visualDesc, workingScreenshot, style, true, maxChars),
+        maxChars,
     );
     if (!overflow) {
         return { success: false, error: '已取消發布。' };
