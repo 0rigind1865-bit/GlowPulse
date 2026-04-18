@@ -10,6 +10,12 @@ export type Feature = {
 
 export const GLOWMOMENT_FEATURES: Feature[] = [
     {
+        name: '已確認預約詳情',
+        pain: '預約確認後不易追蹤',
+        solution: '整合預約詳情於畫面中，方便查看',
+        hook: '一目了然的預約資訊，提升服務體驗',
+    },
+    {
         name: '服務項目管理',
         pain: '管理服務項目複雜且耗時',
         solution: '提供直覺式介面，快速編輯服務項目，包括名稱、時間、價格等資訊',

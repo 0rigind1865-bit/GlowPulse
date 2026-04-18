@@ -16,13 +16,13 @@ export const SCREENSHOTS: Screenshot[] = [
     {
         filename: 'service-setup.png',
         githubUrl: 'https://raw.githubusercontent.com/0rigind1865-bit/GlowPulse/main/assets/screenshots/service-setup.png',
-        featureName: '服務項目管理',
-        description: '此SaaS行動應用介面用於編輯服務項目。畫面顯示服務名稱「法式手繪美甲」、品牌圖片及刪除按鈕。下方可輸入服務時間（1小時）、總價（3000）與訂金（500），並有上下調整時間的選擇器。使用者可點擊「新增項目」或「儲存服務項目」按鈕進行操作。',
+        featureName: '已確認預約詳情',
+        description: '此SaaS產品截圖顯示預約確認畫面。上方標示服務提供者「Glow」及「已確認」狀態。左側有服務圖片與「諮詢」名稱。右側列出地址、2026年4月30日週四的日期，以及07:00-08:00的時間。下方顯示NT$100費用（不需訂金），並提供「加入 Google 行事曆」和「再次預約」操作按鈕。',
     },
     {
         filename: '2.png',
         githubUrl: 'https://raw.githubusercontent.com/0rigind1865-bit/GlowPulse/main/assets/screenshots/2.png',
-        featureName: '服務項目管理',
-        description: '此SaaS行動應用介面用於編輯服務項目。畫面顯示服務名稱「法式手繪美甲」、品牌圖片及刪除按鈕。下方可輸入服務時間（1小時）、總價（3000）與訂金（500），並有上下調整時間的選擇器。使用者可點擊「新增項目」或「儲存服務項目」按鈕進行操作。',
+        featureName: '',
+        description: '',
     },
 ];
