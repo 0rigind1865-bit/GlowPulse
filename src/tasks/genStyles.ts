@@ -1,6 +1,8 @@
 // 任務：從 BRAND_CONTEXT 的【從優質貼文學到的技巧】自動衍生更多 POST_STYLES
 // 每條技巧對應一種寫作切入角度，AI 會將技巧轉化成可直接套用的風格指令
-// 流程：讀取技巧清單 → AI 分析 → 生成新風格 → 確認後寫回 styles.ts
+// 流程：讀取技巧清單 → AI 分析 → 生成「純新增」風格 → 代碼合併 → 確認後寫回 styles.ts
+//
+// 設計原則：AI 只負責輸出全新的條目，不包含舊有風格，避免舊風格被 AI 改寫
 
 import { generate } from '../services/generate.js';
 import { BRAND_CONTEXT } from '../data/brand.js';
@@ -56,9 +58,9 @@ async function generateNewStyles(techniquesSection: string): Promise<string> {
         existingStylesSummary,
         '',
         '【任務說明】',
-        '1. 從上方技巧清單中，找出尚未被現有三個風格涵蓋的寫作角度',
-        '2. 每個角度衍生成一個新的 PostStyle 條目',
-        '3. 目標生成 4-6 個新風格，讓整體風格庫達到 7-9 種不同切入方式',
+        '1. 從上方技巧清單中，找出尚未被現有風格涵蓋的寫作角度',
+        '2. 每個未涵蓋的角度衍生成一個全新的 PostStyle 條目',
+        '3. 目標生成 2-4 個新風格（視未涵蓋的技巧數量而定）',
         '4. 每個新風格的 instruction 必須包含：',
         '   - 明確的切入角度（怎麼開頭）',
         '   - 至少一個可直接模仿的句型範例（用『』包住）',
@@ -66,17 +68,19 @@ async function generateNewStyles(techniquesSection: string): Promise<string> {
         '   - 結尾策略（如何引導留言或點進連結）',
         '   - 如何自然帶入 GlowMoment 預約系統',
         '',
+        '【重要限制】：',
+        '- 只輸出「全新」的風格條目，絕對不要包含現有風格（職人共鳴感、創業乾貨型等）',
+        '- 如果所有技巧都已被現有風格涵蓋，styles 陣列輸出空陣列 []',
+        '- 現有風格的合併由程式負責，你只需要提供純增量',
+        '',
         '【請依下列格式輸出（嚴格遵守）】：',
         '',
         '<<<UPDATES_JSON>>>',
         '{',
         '  "brand_principles": [],',
         '  "styles": [',
-        '    { "name": "職人共鳴感", "instruction": "（保留原有，不修改）" },',
-        '    { "name": "創業乾貨型", "instruction": "（保留原有，不修改）" },',
-        '    { "name": "視覺至上型", "instruction": "（保留原有，不修改）" },',
-        '    { "name": "（新風格名稱，2-5 字）", "instruction": "（新風格的完整指令）" },',
-        '    （更多新風格...）',
+        '    { "name": "（全新風格名稱，2-5 字，不得與現有風格重名）", "instruction": "（新風格的完整指令）" },',
+        '    （更多全新風格，或空陣列 [] 表示無需新增）',
         '  ]',
         '}',
         '<<<END_UPDATES_JSON>>>',
@@ -85,6 +89,7 @@ async function generateNewStyles(techniquesSection: string): Promise<string> {
         '',
         '## 新增風格說明',
         '（說明每個新風格對應哪條技巧、為什麼這樣設計、適合哪種場景發文）',
+        '（若無新增，說明目前技巧已被現有風格完整涵蓋的原因）',
     ].join('\n');
 
     return generate('genStyles', system, prompt, 4000, 0.6);
@@ -97,8 +102,9 @@ async function generateNewStyles(techniquesSection: string): Promise<string> {
  *
  * 執行流程：
  *   1. 提取 BRAND_CONTEXT 中的技巧清單
- *   2. AI 分析現有風格的覆蓋範圍，衍生新風格條目
- *   3. 確認後更新 styles.ts（包含現有 3 個 + 新增的 N 個）
+ *   2. AI 只輸出「純新增」的風格條目（不含現有風格）
+ *   3. 代碼負責去重並合併：[...POST_STYLES, ...newStyles]
+ *   4. 確認後寫回 styles.ts（現有風格完全不受影響）
  */
 export async function runGenStyles(): Promise<GenStylesResult> {
     console.log('\n📖 讀取品牌技巧清單...');
@@ -116,10 +122,10 @@ export async function runGenStyles(): Promise<GenStylesResult> {
     console.log('\n🤖 AI 正在衍生新發文風格...');
     const rawAiOutput = await generateNewStyles(techniquesSection);
 
-    // 解析結構化更新區塊
+    // 解析結構化更新區塊（AI 只輸出新增條目）
     const updates = parseDataUpdates(rawAiOutput);
 
-    if (!updates || !updates.styles?.length) {
+    if (!updates) {
         console.log('\n⚠️  未解析到結構化風格輸出，顯示原始內容供參考：');
         console.log('─'.repeat(50));
         console.log(rawAiOutput.slice(0, 2000));
@@ -127,20 +133,14 @@ export async function runGenStyles(): Promise<GenStylesResult> {
         return { success: false, error: 'AI 未輸出符合格式的 styles 區塊' };
     }
 
-    const newStylesCount = updates.styles.length - POST_STYLES.length;
-    const newNames = updates.styles.slice(POST_STYLES.length).map(s => s.name);
+    // 去重：過濾掉與現有風格同名的條目（以防 AI 仍然輸出了舊風格）
+    const existingNames = new Set(POST_STYLES.map(s => s.name));
+    const genuinelyNew = updates.styles.filter(s => !existingNames.has(s.name));
+    const duplicatesRemoved = updates.styles.length - genuinelyNew.length;
 
-    // 顯示新增的風格清單供確認
-    console.log(`\n📋 AI 建議新增 ${newStylesCount > 0 ? newStylesCount : 0} 個風格（共 ${updates.styles.length} 個）：`);
-    updates.styles.forEach((s, i) => {
-        const isNew = i >= POST_STYLES.length;
-        const tag = isNew ? ' ✨ 新增' : ' （現有）';
-        console.log(`   ${i + 1}. 【${s.name}】${tag}`);
-        if (isNew) {
-            // 顯示前 60 字元的指令預覽
-            console.log(`      ${s.instruction.slice(0, 80)}...`);
-        }
-    });
+    if (duplicatesRemoved > 0) {
+        console.log(`   ⚠️  過濾掉 ${duplicatesRemoved} 個與現有風格同名的條目`);
+    }
 
     // 顯示設計說明
     const analysis = stripUpdatesBlock(rawAiOutput);
@@ -150,13 +150,24 @@ export async function runGenStyles(): Promise<GenStylesResult> {
         console.log('─'.repeat(50));
     }
 
-    if (newStylesCount <= 0) {
-        console.log('\n⚠️  AI 未生成額外風格（可能認為現有風格已足夠覆蓋所有技巧）。');
+    if (genuinelyNew.length === 0) {
+        console.log('\n✅ AI 判斷現有風格已足夠涵蓋所有技巧，無需新增。');
         return { success: true, newStylesCount: 0, totalStyles: POST_STYLES.length };
     }
 
-    const preview = `新增風格：${newNames.join('、')}`;
-    const shouldUpdate = await confirmAction(`是否將 ${updates.styles.length} 個風格寫回 styles.ts？`, preview);
+    // 顯示待新增的風格清單
+    const totalAfterMerge = POST_STYLES.length + genuinelyNew.length;
+    console.log(`\n📋 AI 建議新增 ${genuinelyNew.length} 個風格（合併後共 ${totalAfterMerge} 個）：`);
+    genuinelyNew.forEach((s, i) => {
+        console.log(`   ${POST_STYLES.length + i + 1}. 【${s.name}】 ✨ 新增`);
+        console.log(`      ${s.instruction.slice(0, 80)}...`);
+    });
+
+    const preview = `新增風格：${genuinelyNew.map(s => s.name).join('、')}`;
+    const shouldUpdate = await confirmAction(
+        `是否將 ${genuinelyNew.length} 個新風格合併寫回 styles.ts？`,
+        preview,
+    );
 
     if (!shouldUpdate) {
         console.log('   已略過寫入。');
@@ -164,9 +175,11 @@ export async function runGenStyles(): Promise<GenStylesResult> {
     }
 
     try {
-        updateStylesTs(updates.styles);
-        console.log(`\n✅ styles.ts 已更新，共 ${updates.styles.length} 個風格`);
-        return { success: true, newStylesCount, totalStyles: updates.styles.length };
+        // 代碼負責合併：現有風格完全不動，只附加新增條目
+        const merged = [...POST_STYLES, ...genuinelyNew];
+        updateStylesTs(merged);
+        console.log(`\n✅ styles.ts 已更新，共 ${merged.length} 個風格`);
+        return { success: true, newStylesCount: genuinelyNew.length, totalStyles: merged.length };
     } catch (e) {
         return { success: false, error: `寫入 styles.ts 失敗：${e instanceof Error ? e.message : String(e)}` };
     }

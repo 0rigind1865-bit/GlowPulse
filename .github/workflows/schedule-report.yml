@@ -39,6 +39,15 @@ jobs:
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_TOKEN_REFRESHED_AT: ${{ secrets.THREADS_TOKEN_REFRESHED_AT }}
 
+      - name: 從品牌技巧衍生新發文風格
+        # 在週報更新 brand.ts 之後執行，確保讀到最新的技巧清單
+        # 只新增尚未涵蓋的風格，不改寫現有風格
+        run: npm run gen-styles -- --yes
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
       - name: 建立 PR（週報 + data 層更新）
         run: |
           git config user.name  "GlowPulse Bot"
