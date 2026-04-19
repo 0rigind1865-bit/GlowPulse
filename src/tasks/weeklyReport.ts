@@ -16,6 +16,10 @@ const REPORTS_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../docs/re
 // 取前 N 篇高互動貼文送進 AI 分析
 const TOP_POSTS_COUNT = 5;
 
+// 若本週可分析的貼文數量低於此門檻，跳過 AI 分析與 data 層更新
+// 避免小樣本讓 AI 用不具代表性的觀察覆蓋掉多週累積的寫作技巧
+const MIN_POSTS_FOR_AI_ANALYSIS = 5;
+
 // ─── 格式化與 AI 呼叫 ────────────────────────────────────────────────────────
 
 function formatPostsForAI(posts: PostInsights[]): string {
@@ -163,6 +167,49 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
     const sorted = [...insights].sort((a, b) => b.engagementScore - a.engagementScore);
     const topPosts = sorted.slice(0, Math.min(TOP_POSTS_COUNT, sorted.length));
     const lowPosts = sorted.slice(-Math.min(TOP_POSTS_COUNT, sorted.length)).reverse();
+
+    // ── 樣本數不足：跳過 AI 分析，只存純數據報告 ─────────────────────────────
+    if (insights.length < MIN_POSTS_FOR_AI_ANALYSIS) {
+        console.log(`\n⚠️  本週可分析貼文數量不足（${insights.length} 篇，AI 分析需至少 ${MIN_POSTS_FOR_AI_ANALYSIS} 篇）`);
+        console.log('   跳過 AI 分析與 data 層更新，避免小樣本造成語意漂移。');
+
+        const totalEngagement = insights.reduce((sum, p) => sum + p.engagementScore, 0);
+        const avgEngagement = Math.round(totalEngagement / insights.length);
+        const topPost = sorted[0];
+
+        const reportLines = [
+            `# GlowPulse 週報 ${weekStart}（數據快照）`,
+            '',
+            '> ⚠️ 本週貼文數量不足，僅儲存數據快照，未進行 AI 分析與技巧更新。',
+            '',
+            '## 數據總覽',
+            '',
+            '| 指標 | 數值 |',
+            '|---|---|',
+            `| 分析週期 | ${weekStart} ～ ${now.toISOString().split('T')[0]} |`,
+            `| 發文總篇數 | ${insights.length} 篇 |`,
+            `| 平均互動分數 | ${avgEngagement} |`,
+            `| 最高互動分數 | ${topPost.engagementScore}（${new Date(topPost.timestamp).toLocaleDateString('zh-TW')}）|`,
+            '',
+            '## 所有貼文排名',
+            '',
+            '| 排名 | 日期 | 分數 | 貼文摘要 |',
+            '|---|---|---|---|',
+            ...sorted.map((p, i) => {
+                const date = new Date(p.timestamp).toLocaleDateString('zh-TW');
+                const preview = p.text.slice(0, 30).replace(/\n/g, ' ') + (p.text.length > 30 ? '…' : '');
+                return `| ${i + 1} | ${date} | ${p.engagementScore} | ${preview} |`;
+            }),
+            '',
+            '---',
+            '',
+            `*由 GlowPulse 自動產生於 ${now.toLocaleString('zh-TW')}*`,
+        ];
+
+        const reportPath = saveReport(reportLines.join('\n'), weekStart);
+        console.log(`\n📝 數據快照已儲存至：${reportPath}`);
+        return { success: true, reportPath, totalPosts: insights.length, weekStart };
+    }
 
     console.log('\n🤖 AI 正在分析貼文模式...');
     const rawAiOutput = await analyzeWithAI(topPosts, lowPosts);

@@ -1,11 +1,19 @@
 // 共用工具：解析 AI 回傳的 <<<UPDATES_JSON>>> 區塊，並寫回 brand.ts / styles.ts
 // weeklyReport.ts 與 analyzeReference.ts 都需要這個能力，抽到此處避免重複
+//
+// 設計原則：updateBrandTs 採「累積合併」而非「覆寫」，避免自我學習迴路的語意漂移：
+//   - 保留現有技巧，只新增 AI 帶來的真正新觀察
+//   - 設上限（MAX_PRINCIPLES）防止無限增長
+//   - 用前 20 字元去重，容忍措辭差異
 
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '../data');
+
+// 技巧清單的最大保留條數，超過時捨棄最早的條目（FIFO）
+const MAX_PRINCIPLES = 20;
 
 // ─── 型別定義 ────────────────────────────────────────────────────────────────
 
@@ -45,11 +53,45 @@ export function stripUpdatesBlock(aiOutput: string): string {
 // ─── 寫入工具 ────────────────────────────────────────────────────────────────
 
 /**
- * 更新 brand.ts 中的【寫作原則】區塊
- * 只替換原則清單，品牌定位與目標客群維持不變
- * 尋找【寫作原則】標記，替換到結尾反引號之前的所有內容
+ * 從 brand.ts 原始內容中解析現有的技巧清單
+ * 回傳每條技巧的文字（不含前綴 "- "）
  */
-export function updateBrandTs(principles: string[]): void {
+function extractExistingPrinciples(content: string): string[] {
+    const markerIdx = content.indexOf('【從優質貼文學到的技巧】');
+    if (markerIdx === -1) return [];
+    const afterMarker = content.slice(markerIdx);
+    const closingIdx = afterMarker.indexOf('\n`');
+    const section = closingIdx === -1 ? afterMarker : afterMarker.slice(0, closingIdx);
+    return section
+        .split('\n')
+        .filter(l => l.trim().startsWith('- '))
+        .map(l => l.trim().replace(/^- /, ''))
+        .filter(Boolean);
+}
+
+/**
+ * 將 AI 新提出的技巧與現有清單合併，避免語意漂移：
+ * - 以前 20 字元做去重（容忍措辭微差異）
+ * - 超過 MAX_PRINCIPLES 時捨棄最舊的條目（FIFO）
+ */
+function mergePrinciples(existing: string[], incoming: string[]): string[] {
+    // 取前 20 個字元、移除標點空白後作為去重 key
+    const normalize = (s: string) => s.slice(0, 20).replace(/[\s，。！？、]/g, '');
+    const existingKeys = new Set(existing.map(normalize));
+
+    const trulyNew = incoming.filter(p => p.trim() && !existingKeys.has(normalize(p)));
+    const merged = [...existing, ...trulyNew];
+
+    // 若超出上限，從最舊的（陣列前端）開始丟棄
+    return merged.length > MAX_PRINCIPLES ? merged.slice(merged.length - MAX_PRINCIPLES) : merged;
+}
+
+/**
+ * 更新 brand.ts 中的【從優質貼文學到的技巧】區塊
+ * 採「累積合併」模式：保留現有技巧，只補入 AI 帶來的真正新觀察
+ * 品牌定位與目標客群維持不變
+ */
+export function updateBrandTs(incomingPrinciples: string[]): void {
     const filePath = join(DATA_DIR, 'brand.ts');
     const content = readFileSync(filePath, 'utf-8');
 
@@ -63,8 +105,19 @@ export function updateBrandTs(principles: string[]): void {
     const closingIdx = afterMarker.indexOf('\n`');
     if (closingIdx === -1) throw new Error('brand.ts 格式異常，找不到結尾反引號');
 
+    // 讀出現有技巧 → 合併新技巧 → 寫回
+    const existing = extractExistingPrinciples(content);
+    const merged = mergePrinciples(existing, incomingPrinciples);
+    const newCount = merged.length - existing.length;
+
+    if (newCount > 0) {
+        console.log(`   📚 累積模式：保留 ${existing.length} 條既有技巧，新增 ${newCount} 條`);
+    } else {
+        console.log(`   📚 累積模式：本次無真正新增技巧（AI 提供的均已存在），技巧總數維持 ${existing.length} 條`);
+    }
+
     const closing = afterMarker.slice(closingIdx);
-    const newSection = '【從優質貼文學到的技巧】\n' + principles.map(p => `- ${p}`).join('\n');
+    const newSection = '【從優質貼文學到的技巧】\n' + merged.map(p => `- ${p}`).join('\n');
 
     writeFileSync(filePath, beforeMarker + newSection + closing, 'utf-8');
 }
