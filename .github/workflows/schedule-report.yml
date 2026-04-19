@@ -46,6 +46,9 @@ jobs:
 
           # 建立當日的 bot branch，避免直接推 main
           BRANCH="bot/weekly-report-$(date '+%Y-%m-%d')"
+
+          # 若同名 branch 已存在（同天重跑），刪掉重建
+          git push origin --delete "$BRANCH" 2>/dev/null || true
           git checkout -b "$BRANCH"
           git add docs/reports/ src/data/brand.ts src/data/styles.ts
 
@@ -57,33 +60,25 @@ jobs:
           git commit -m "chore: 自動週報 $(date '+%Y-%m-%d')"
           git push origin "$BRANCH"
 
-          # 取得 brand.ts / styles.ts 的 diff 摘要，放進 PR body 供 review
-          BRAND_DIFF=$(git diff HEAD~1 -- src/data/brand.ts | head -60 || true)
-          STYLES_DIFF=$(git diff HEAD~1 -- src/data/styles.ts | head -60 || true)
-
-          gh pr create \
-            --title "📊 週報更新 $(date '+%Y-%m-%d')" \
-            --body "## AI 分析本週發文成效
+          # PR body 寫入暫存檔，避免多行字串在 shell 中的縮排問題
+          cat > /tmp/pr_body.md << 'PREOF'
+          ## AI 分析本週發文成效
 
           請確認以下修改後再 merge：
 
-          - \`docs/reports/\` 本週報告
-          - \`src/data/brand.ts\` 寫作技巧（如有更新）
-          - \`src/data/styles.ts\` 發文風格（如有更新）
+          - `docs/reports/` 本週報告
+          - `src/data/brand.ts` 寫作技巧（如有更新）
+          - `src/data/styles.ts` 發文風格（如有更新）
 
           > ⚠️ **請先看 Files changed tab 確認 AI 的建議符合品牌方向，再 merge。**
           > 特別注意 styles.ts — AI 有時會改寫原有風格指令，不只新增。
 
-          🤖 由 GlowPulse Bot 自動建立" \
-            --base main \
-            --label "bot" 2>/dev/null || \
+          🤖 由 GlowPulse Bot 自動建立
+          PREOF
+
           gh pr create \
             --title "📊 週報更新 $(date '+%Y-%m-%d')" \
-            --body "## AI 分析本週發文成效
-
-          請確認 brand.ts / styles.ts 的 diff 後再 merge。
-
-          🤖 由 GlowPulse Bot 自動建立" \
+            --body-file /tmp/pr_body.md \
             --base main
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
