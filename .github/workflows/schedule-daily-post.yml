@@ -1,0 +1,98 @@
+name: 每日隨機貼文
+
+# 每天隨機選一個時段、隨機選一種貼文類型發布
+#
+# 設計原理：
+#   - 設定 5 個可能的 UTC 觸發時段（對應台灣 09:00 ~ 21:00）
+#   - 每個時段觸發後，用當天日期的 hash 決定「今日選定時段」
+#   - 只有選定時段的那次觸發才真正執行，其餘立即退出（不浪費分鐘數）
+#   - 發文類型在執行時用 $RANDOM 三選一：長文 / 短文 / 圖片貼文
+
+on:
+  schedule:
+    - cron: '0 1 * * *'    # 台灣 09:00
+    - cron: '0 4 * * *'    # 台灣 12:00
+    - cron: '0 7 * * *'    # 台灣 15:00
+    - cron: '0 10 * * *'   # 台灣 18:00
+    - cron: '0 13 * * *'   # 台灣 21:00
+  workflow_dispatch:
+    inputs:
+      use_latest:
+        description: '圖片貼文使用最新截圖（--latest）'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 決定今日是否在此時段發文
+        id: gate
+        run: |
+          # 5 個可能的 UTC 小時（對應上方 cron）
+          SLOTS=(1 4 7 10 13)
+
+          # 用當天日期做 checksum，取餘數決定今日選定時段索引
+          SEED=$(date -u +%Y%m%d | cksum | awk '{print $1}')
+          IDX=$((SEED % 5))
+          TODAY_SLOT=${SLOTS[$IDX]}
+          NOW=$(date -u +%-H)
+
+          TW_HOUR=$((TODAY_SLOT + 8))
+          echo "today_slot=${TODAY_SLOT}" >> $GITHUB_OUTPUT
+
+          if [ "$NOW" -eq "$TODAY_SLOT" ]; then
+            echo "active=true" >> $GITHUB_OUTPUT
+            echo "✅ 今日選定時段 UTC ${TODAY_SLOT}（台灣 ${TW_HOUR}:00），目前符合，繼續執行。"
+          else
+            echo "active=false" >> $GITHUB_OUTPUT
+            echo "⏭️  今日選定時段 UTC ${TODAY_SLOT}（台灣 ${TW_HOUR}:00），目前 UTC ${NOW}，跳過此觸發。"
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.active == 'true' || github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        if: steps.gate.outputs.active == 'true' || github.event_name == 'workflow_dispatch'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.gate.outputs.active == 'true' || github.event_name == 'workflow_dispatch'
+        run: npm ci
+
+      - name: 隨機選擇發文類型並發布
+        if: steps.gate.outputs.active == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          TYPE=$((RANDOM % 3))
+          case $TYPE in
+            0)
+              echo "📝 今日類型：長文貼文"
+              npm run post -- --yes
+              ;;
+            1)
+              echo "💬 今日類型：短文貼文（130 字）"
+              npm run post -- --yes --max-chars 130
+              ;;
+            2)
+              echo "🖼️  今日類型：圖片貼文"
+              if [ "${{ github.event.inputs.use_latest }}" = "true" ]; then
+                npm run image-post -- --yes --latest
+              else
+                npm run image-post -- --yes
+              fi
+              ;;
+          esac
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_TOKEN_REFRESHED_AT: ${{ secrets.THREADS_TOKEN_REFRESHED_AT }}
