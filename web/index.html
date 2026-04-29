@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GlowPulse">
+  <title>GlowPulse</title>
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --surface: #1c1c1e;
+      --surface2: #2c2c2e;
+      --border: #38383a;
+      --text: #f2f2f7;
+      --text-dim: #8e8e93;
+      --accent: #f5a623;
+      --success: #30d158;
+      --error: #ff453a;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: calc(60px + var(--safe-bottom));
+      overscroll-behavior: none;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      padding: calc(14px + var(--safe-top)) 20px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+    header h1 span { color: var(--accent); }
+    .settings-btn {
+      background: none; border: none;
+      color: var(--text-dim); font-size: 20px; cursor: pointer; padding: 4px;
+    }
+
+    /* ── Bottom Nav ──────────────────────────────────────── */
+    nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      padding-bottom: var(--safe-bottom);
+      z-index: 100;
+    }
+    nav button {
+      flex: 1; padding: 10px 0 6px; background: none; border: none;
+      color: var(--text-dim); font-size: 10px; font-weight: 500;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      cursor: pointer; transition: color 0.15s;
+    }
+    nav button.active { color: var(--accent); }
+    nav button svg { width: 24px; height: 24px; stroke-width: 1.8; }
+
+    /* ── Main Content ────────────────────────────────────── */
+    main { padding: 16px; max-width: 560px; margin: 0 auto; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .section-title {
+      font-size: 12px; font-weight: 600; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;
+    }
+
+    /* ── Cards ───────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card + .section-title { margin-top: 20px; }
+
+    /* ── Forms ───────────────────────────────────────────── */
+    .form-group { margin-bottom: 14px; }
+    .form-group:last-child { margin-bottom: 0; }
+    label {
+      display: block; font-size: 13px; font-weight: 500;
+      color: var(--text-dim); margin-bottom: 6px;
+    }
+    input[type="text"], input[type="password"], textarea, select {
+      width: 100%;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 11px 13px;
+      color: var(--text); font-size: 15px; font-family: inherit;
+      outline: none; transition: border-color 0.15s; appearance: none;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 130px; line-height: 1.5; }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px;
+    }
+
+    /* ── Buttons ─────────────────────────────────────────── */
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; padding: 13px; border: none; border-radius: 10px;
+      font-size: 16px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+      font-family: inherit;
+    }
+    .btn:active { opacity: 0.75; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-sm { font-size: 14px; padding: 10px 14px; width: auto; display: inline-flex; }
+    .mt { margin-top: 12px; }
+
+    /* ── Status ──────────────────────────────────────────── */
+    .status {
+      padding: 11px 13px; border-radius: 10px; font-size: 13px;
+      margin-top: 12px; display: none; white-space: pre-wrap; line-height: 1.5;
+    }
+    .status.show { display: block; }
+    .status.success { background: rgba(48,209,88,.12); color: var(--success); border: 1px solid rgba(48,209,88,.25); }
+    .status.error { background: rgba(255,69,58,.12); color: var(--error); border: 1px solid rgba(255,69,58,.25); }
+    .status.info { background: rgba(245,166,35,.12); color: var(--accent); border: 1px solid rgba(245,166,35,.25); }
+
+    /* ── Report List ─────────────────────────────────────── */
+    .report-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; margin-bottom: 8px;
+      cursor: pointer; user-select: none; transition: border-color 0.15s;
+    }
+    .report-item:active { border-color: var(--accent); }
+    .report-item .info { display: flex; flex-direction: column; gap: 2px; }
+    .report-item .date { font-weight: 600; font-size: 15px; }
+    .report-item .meta { font-size: 12px; color: var(--text-dim); }
+    .report-item .chevron { color: var(--text-dim); font-size: 20px; line-height: 1; }
+
+    /* ── Report Viewer (full-screen) ─────────────────────── */
+    .report-viewer {
+      display: none; position: fixed; inset: 0;
+      background: var(--bg); z-index: 200; overflow-y: auto;
+    }
+    .report-viewer.open { display: block; }
+    .report-viewer-header {
+      background: var(--surface); padding: calc(14px + var(--safe-top)) 20px 14px;
+      display: flex; align-items: center; gap: 14px;
+      border-bottom: 1px solid var(--border); position: sticky; top: 0;
+    }
+    .back-btn {
+      background: none; border: none; color: var(--accent);
+      font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit;
+      display: flex; align-items: center; gap: 4px; padding: 0;
+    }
+    .report-viewer-title { font-weight: 600; font-size: 15px; }
+    .report-content {
+      padding: 20px; font-size: 13px; line-height: 1.7;
+      font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+      color: #c8c8c8; white-space: pre-wrap; word-break: break-word;
+    }
+
+    /* ── Drop Zone ───────────────────────────────────────── */
+    .drop-zone {
+      border: 2px dashed var(--border); border-radius: 12px;
+      padding: 36px 16px; text-align: center; cursor: pointer;
+      transition: border-color 0.15s; margin-bottom: 14px;
+    }
+    .drop-zone.has-file { border-color: var(--accent); padding: 0; }
+    .drop-zone .icon { font-size: 36px; margin-bottom: 8px; }
+    .drop-zone p { color: var(--text-dim); font-size: 14px; margin-top: 4px; }
+    .drop-zone strong { color: var(--text); }
+    .preview-img {
+      width: 100%; max-height: 220px; object-fit: cover;
+      border-radius: 10px; display: block;
+    }
+
+    /* ── Spinner ─────────────────────────────────────────── */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(0,0,0,0.25); border-top-color: currentColor;
+      border-radius: 50%; animation: spin 0.55s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Settings Sheet ──────────────────────────────────── */
+    .overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 300; align-items: flex-end;
+    }
+    .overlay.open { display: flex; }
+    .sheet {
+      background: var(--surface); border-radius: 20px 20px 0 0;
+      padding: 8px 20px calc(24px + var(--safe-bottom));
+      width: 100%;
+    }
+    .sheet-handle {
+      width: 36px; height: 4px; background: var(--border);
+      border-radius: 2px; margin: 10px auto 20px;
+    }
+    .sheet h2 { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+    .mono { font-family: 'SF Mono', Consolas, monospace; font-size: 13px !important; }
+
+    /* ── Misc ────────────────────────────────────────────── */
+    .empty { text-align: center; color: var(--text-dim); padding: 48px 0; font-size: 14px; }
+    .empty .emoji { font-size: 36px; margin-bottom: 8px; }
+    .loading { text-align: center; color: var(--text-dim); padding: 32px 0; font-size: 14px; }
+    .hint { font-size: 12px; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
+    .hint a { color: var(--accent); text-decoration: none; }
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+    code {
+      background: var(--surface2); border-radius: 5px;
+      padding: 1px 5px; font-size: 12px; font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<header>
+  <h1>✨ <span>GlowPulse</span></h1>
+  <button class="settings-btn" onclick="openSettings()" title="設定">⚙️</button>
+</header>
+
+<!-- ── Main ──────────────────────────────────────────────── -->
+<main>
+
+  <!-- Tab: 週報 -->
+  <div id="tab-reports" class="tab-panel active">
+    <div class="section-title">發文成效週報</div>
+    <div id="reports-list"><div class="loading">載入中…</div></div>
+  </div>
+
+  <!-- Tab: 截圖 -->
+  <div id="tab-upload" class="tab-panel">
+    <div class="section-title">上傳截圖素材</div>
+    <div class="card">
+      <!-- Drop Zone / Preview -->
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <div class="icon">📸</div>
+        <p><strong>點選選擇圖片</strong></p>
+        <p>支援 PNG / JPG / WEBP</p>
+      </div>
+      <input type="file" id="file-input" accept="image/*" style="display:none">
+
+      <div class="form-group">
+        <label>檔案名稱（純英文 + 連字號，不含副檔名）</label>
+        <input type="text" id="filename-input" placeholder="e.g. booking-calendar-view">
+        <p class="hint">⚠️ 只能用 <code>a-z 0-9 - _</code>，避免空格與中文（Meta API 限制）</p>
+      </div>
+
+      <div class="form-group">
+        <label>對應功能名稱（選填，之後 AI 會用到）</label>
+        <input type="text" id="feature-name-input" placeholder="e.g. 每週營業時段管理">
+      </div>
+
+      <button class="btn btn-primary mt" id="upload-btn" onclick="uploadScreenshot()" disabled>
+        上傳到 GitHub
+      </button>
+      <div class="status" id="upload-status"></div>
+    </div>
+  </div>
+
+  <!-- Tab: 參考貼文 -->
+  <div id="tab-ref" class="tab-panel">
+    <div class="section-title">新增參考貼文</div>
+    <div class="card">
+      <div class="form-group">
+        <label>貼文內容</label>
+        <textarea id="ref-content" placeholder="從 Threads 複製貼上貼文文字…"></textarea>
+      </div>
+
+      <div class="row">
+        <div class="form-group">
+          <label>風格標籤（選填）</label>
+          <select id="ref-style">
+            <option value="">未分類</option>
+            <option value="職人共鳴感">職人共鳴感</option>
+            <option value="創業乾貨型">創業乾貨型</option>
+            <option value="視覺至上型">視覺至上型</option>
+            <option value="情感共鳴型">情感共鳴型</option>
+            <option value="問題解決型">問題解決型</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>來源 URL（選填）</label>
+        <input type="text" id="ref-url" placeholder="https://www.threads.net/…">
+      </div>
+
+      <button class="btn btn-primary" id="ref-btn" onclick="addReferencePost()">
+        新增到參考庫
+      </button>
+      <div class="status" id="ref-status"></div>
+    </div>
+
+    <div class="section-title">iOS Shortcut 快速分享</div>
+    <div class="card">
+      <p style="font-size:14px;line-height:1.6;color:var(--text-dim)">
+        從 Threads 長按貼文 → <strong style="color:var(--text)">分享</strong> → 選擇
+        <strong style="color:var(--accent)">「加入參考貼文」</strong> Shortcut，
+        即可直接預填文字並開啟此頁面。
+      </p>
+      <button class="btn btn-secondary mt" onclick="showShortcutGuide()">
+        查看 Shortcut 設定步驟
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── Bottom Navigation ──────────────────────────────────── -->
+<nav>
+  <button id="nav-reports" class="active" onclick="switchTab('reports',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    週報
+  </button>
+  <button id="nav-upload" onclick="switchTab('upload',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+    截圖
+  </button>
+  <button id="nav-ref" onclick="switchTab('ref',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    參考貼文
+  </button>
+</nav>
+
+<!-- ── Report Full-Screen Viewer ─────────────────────────── -->
+<div class="report-viewer" id="report-viewer">
+  <div class="report-viewer-header">
+    <button class="back-btn" onclick="closeReport()">
+      <svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 1L1 7l6 6"/></svg>
+      返回
+    </button>
+    <span class="report-viewer-title" id="report-viewer-title"></span>
+  </div>
+  <div class="report-content" id="report-viewer-content"></div>
+</div>
+
+<!-- ── Settings Sheet ────────────────────────────────────── -->
+<div class="overlay" id="settings-overlay" onclick="closeSettingsOutside(event)">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>設定</h2>
+
+    <div class="form-group">
+      <label>GitHub Personal Access Token</label>
+      <input type="password" id="s-token" class="mono" placeholder="ghp_…">
+      <p class="hint">需要 <code>repo</code> 權限。<a href="https://github.com/settings/tokens/new?scopes=repo&description=GlowPulse+Dashboard" target="_blank">點此產生 →</a></p>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Owner</label>
+        <input type="text" id="s-owner" placeholder="0rigind1865-bit">
+      </div>
+      <div class="form-group">
+        <label>Repo</label>
+        <input type="text" id="s-repo" placeholder="GlowPulse">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Branch</label>
+      <input type="text" id="s-branch" placeholder="main">
+    </div>
+
+    <button class="btn btn-primary mt" onclick="saveSettings()">儲存設定</button>
+    <button class="btn btn-secondary mt" onclick="closeSettings()">取消</button>
+  </div>
+</div>
+
+<!-- ── Shortcut Guide Sheet ───────────────────────────────── -->
+<div class="overlay" id="shortcut-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="sheet" style="max-height:80vh;overflow-y:auto;">
+    <div class="sheet-handle"></div>
+    <h2>iOS Shortcut 設定</h2>
+    <p style="font-size:14px;line-height:1.7;color:var(--text-dim);margin-bottom:16px">
+      在 iOS「捷徑」App 建立以下 Shortcut，之後從 Threads 長按任何貼文就能直接加到參考庫：
+    </p>
+
+    <div style="background:var(--surface2);border-radius:10px;padding:14px;font-size:13px;line-height:1.9;color:var(--text)">
+      <div>📋 <strong>捷徑名稱：</strong>加入參考貼文</div>
+      <div style="margin:12px 0;color:var(--border);border-top:1px solid var(--border)"></div>
+      <div>1️⃣ <strong>接收：</strong>文字（Share Sheet）</div>
+      <div>2️⃣ <strong>URL Encode：</strong>快捷指令輸入</div>
+      <div>3️⃣ <strong>打開 URL：</strong></div>
+      <div style="margin:6px 0 4px 24px;background:var(--surface);border-radius:6px;padding:8px;font-family:monospace;font-size:11px;word-break:break-all;color:var(--accent)" id="shortcut-url-display">（產生中…）</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-left:24px">其中 <code>TEXT</code> 替換為步驟 2 的輸出</div>
+    </div>
+
+    <div style="margin-top:14px;background:var(--surface2);border-radius:10px;padding:14px;font-size:13px;line-height:1.7;color:var(--text-dim)">
+      💡 開啟後瀏覽器自動切換到「參考貼文」頁並預填內容，確認後點「新增到參考庫」即完成。
+    </div>
+
+    <button class="btn btn-secondary mt" onclick="document.getElementById('shortcut-overlay').classList.remove('open')">關閉</button>
+  </div>
+</div>
+
+<script>
+// ═══ Config ════════════════════════════════════════════════
+
+const DEFAULTS = { owner: '0rigind1865-bit', repo: 'GlowPulse', branch: 'main' };
+
+function cfg() {
+  return {
+    token:  localStorage.getItem('gp_token')  || '',
+    owner:  localStorage.getItem('gp_owner')  || DEFAULTS.owner,
+    repo:   localStorage.getItem('gp_repo')   || DEFAULTS.repo,
+    branch: localStorage.getItem('gp_branch') || DEFAULTS.branch,
+  };
+}
+
+// ═══ GitHub API ════════════════════════════════════════════
+
+async function ghGet(path) {
+  const { token, owner, repo } = cfg();
+  const r = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' } }
+  );
+  if (!r.ok) throw new Error(`GitHub ${r.status}`);
+  return r.json();
+}
+
+async function ghPut(path, contentStr, message, sha = null) {
+  const { token, owner, repo, branch } = cfg();
+  const body = {
+    message, branch,
+    content: btoa(unescape(encodeURIComponent(contentStr))),
+    ...(sha ? { sha } : {}),
+  };
+  const r = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!r.ok) { const e = await r.json(); throw new Error(e.message || `GitHub ${r.status}`); }
+  return r.json();
+}
+
+async function ghPutBinary(path, b64, message, sha = null) {
+  const { token, owner, repo, branch } = cfg();
+  const body = { message, branch, content: b64, ...(sha ? { sha } : {}) };
+  const r = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!r.ok) { const e = await r.json(); throw new Error(e.message || `GitHub ${r.status}`); }
+  return r.json();
+}
+
+// ═══ Tab Navigation ════════════════════════════════════════
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'reports') loadReports();
+}
+
+// ═══ Reports ═══════════════════════════════════════════════
+
+async function loadReports() {
+  const el = document.getElementById('reports-list');
+  if (!cfg().token) {
+    el.innerHTML = '<div class="empty"><div class="emoji">🔑</div>請先在設定中輸入 GitHub Token</div>';
+    return;
+  }
+  el.innerHTML = '<div class="loading">載入中…</div>';
+  try {
+    const files = await ghGet('docs/reports');
+    const reports = files.filter(f => f.name.endsWith('.md'))
+                         .sort((a, b) => b.name.localeCompare(a.name));
+    if (!reports.length) {
+      el.innerHTML = '<div class="empty"><div class="emoji">📭</div>尚無週報</div>';
+      return;
+    }
+    el.innerHTML = reports.map((f, i) => {
+      const date = f.name.replace('.md', '');
+      const isLatest = i === 0 ? ' <span style="font-size:10px;background:var(--accent);color:#000;padding:1px 6px;border-radius:4px;font-weight:700">最新</span>' : '';
+      return `
+        <div class="report-item" onclick="openReport('${f.path}','${date}')">
+          <div class="info">
+            <div class="date">📊 ${date}${isLatest}</div>
+            <div class="meta">週報</div>
+          </div>
+          <div class="chevron">›</div>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="empty"><div class="emoji">⚠️</div>${e.message}</div>`;
+  }
+}
+
+async function openReport(path, title) {
+  const viewer  = document.getElementById('report-viewer');
+  const content = document.getElementById('report-viewer-content');
+  document.getElementById('report-viewer-title').textContent = title;
+  viewer.classList.add('open');
+  content.textContent = '載入中…';
+  history.pushState({ viewer: true }, '');
+  try {
+    const data = await ghGet(path);
+    content.textContent = decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
+  } catch (e) {
+    content.textContent = `載入失敗：${e.message}`;
+  }
+}
+
+function closeReport() {
+  document.getElementById('report-viewer').classList.remove('open');
+  if (history.state?.viewer) history.back();
+}
+
+window.addEventListener('popstate', () => {
+  if (document.getElementById('report-viewer').classList.contains('open')) {
+    document.getElementById('report-viewer').classList.remove('open');
+  }
+});
+
+// ═══ Screenshot Upload ═════════════════════════════════════
+
+let _file = null, _b64 = null;
+
+document.getElementById('file-input').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  _file = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const result = ev.target.result;
+    _b64 = result.split(',')[1];
+    // Preview
+    const dz = document.getElementById('drop-zone');
+    dz.innerHTML = `<img class="preview-img" src="${result}" alt="preview">`;
+    dz.classList.add('has-file');
+    // Auto filename
+    const suggested = file.name.replace(/\.[^.]+$/, '')
+                               .replace(/[^a-zA-Z0-9\-_]/g, '-')
+                               .replace(/-+/g, '-')
+                               .toLowerCase();
+    document.getElementById('filename-input').value = suggested;
+    updateUploadBtn();
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('filename-input').addEventListener('input', updateUploadBtn);
+
+function updateUploadBtn() {
+  const name = document.getElementById('filename-input').value;
+  const ok   = _b64 && /^[a-zA-Z0-9\-_]+$/.test(name);
+  document.getElementById('upload-btn').disabled = !ok;
+}
+
+async function uploadScreenshot() {
+  const name     = document.getElementById('filename-input').value;
+  const feature  = document.getElementById('feature-name-input').value.trim();
+  const ext      = _file.name.split('.').pop().toLowerCase();
+  const fullName = `${name}.${ext}`;
+  const imgPath  = `assets/screenshots/${fullName}`;
+  const btn      = document.getElementById('upload-btn');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>上傳中…';
+  showStatus('upload-status', '', '');
+
+  try {
+    // Check existing sha
+    let sha = null;
+    try { sha = (await ghGet(imgPath)).sha; } catch {}
+
+    const { owner, repo } = cfg();
+    const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${imgPath}`;
+
+    // 1. Upload image
+    await ghPutBinary(imgPath, _b64, `新增截圖：${fullName}`, sha);
+
+    // 2. Append to screenshots.ts
+    const tsData = await ghGet('src/data/screenshots.ts');
+    const tsContent = decodeURIComponent(escape(atob(tsData.content.replace(/\n/g,''))));
+    const newEntry = `    {\n        filename: '${fullName}',\n        githubUrl: '${rawUrl}',\n        featureName: '${feature}',\n        description: '',\n    },\n`;
+    const updated = tsContent.replace(/];\s*$/, newEntry + '];\n');
+    await ghPut('src/data/screenshots.ts', updated,
+      `新增截圖記錄：${fullName}`, tsData.sha);
+
+    showStatus('upload-status', 'success',
+      `✅ 上傳成功！\n\n` +
+      `📄 ${fullName} 已加入 assets/screenshots/\n` +
+      `📋 screenshots.ts 已自動更新\n\n` +
+      `下次執行 npm run image-post 即可使用此截圖。`
+    );
+
+    // Reset
+    _file = null; _b64 = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('filename-input').value = '';
+    document.getElementById('feature-name-input').value = '';
+    const dz = document.getElementById('drop-zone');
+    dz.innerHTML = '<div class="icon">📸</div><p><strong>點選選擇圖片</strong></p><p>支援 PNG / JPG / WEBP</p>';
+    dz.classList.remove('has-file');
+
+  } catch (e) {
+    showStatus('upload-status', 'error', `❌ 失敗：${e.message}`);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '上傳到 GitHub';
+}
+
+// ═══ Reference Post ════════════════════════════════════════
+
+async function addReferencePost() {
+  const content = document.getElementById('ref-content').value.trim();
+  const style   = document.getElementById('ref-style').value;
+  const url     = document.getElementById('ref-url').value.trim();
+
+  if (!content) { showStatus('ref-status', 'error', '請輸入貼文內容'); return; }
+  if (!cfg().token) { openSettings(); return; }
+
+  const btn = document.getElementById('ref-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>新增中…';
+
+  try {
+    const data    = await ghGet('docs/reference-posts.md');
+    const current = decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
+    const date    = new Date().toISOString().split('T')[0];
+
+    let entry = '\n\n---\n\n';
+    if (style) entry += `<!-- 風格：${style} -->\n`;
+    if (url)   entry += `<!-- 來源：${url} -->\n`;
+    entry += `<!-- 新增日期：${date} -->\n\n${content}`;
+
+    await ghPut('docs/reference-posts.md', current + entry,
+      `新增參考貼文 ${date}`, data.sha);
+
+    showStatus('ref-status', 'success', `✅ 已加入參考庫！${style ? '\n風格：' + style : ''}`);
+    document.getElementById('ref-content').value = '';
+    document.getElementById('ref-url').value = '';
+
+    // Clear URL params after successful save
+    if (window.location.search) history.replaceState({}, '', window.location.pathname);
+
+  } catch (e) {
+    showStatus('ref-status', 'error', `❌ 失敗：${e.message}`);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '新增到參考庫';
+}
+
+// ═══ Settings ══════════════════════════════════════════════
+
+function openSettings() {
+  const c = cfg();
+  document.getElementById('s-token').value  = c.token;
+  document.getElementById('s-owner').value  = c.owner;
+  document.getElementById('s-repo').value   = c.repo;
+  document.getElementById('s-branch').value = c.branch;
+  document.getElementById('settings-overlay').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.remove('open');
+}
+
+function closeSettingsOutside(e) {
+  if (e.target === document.getElementById('settings-overlay')) closeSettings();
+}
+
+function saveSettings() {
+  localStorage.setItem('gp_token',  document.getElementById('s-token').value.trim());
+  localStorage.setItem('gp_owner',  document.getElementById('s-owner').value.trim() || DEFAULTS.owner);
+  localStorage.setItem('gp_repo',   document.getElementById('s-repo').value.trim()  || DEFAULTS.repo);
+  localStorage.setItem('gp_branch', document.getElementById('s-branch').value.trim() || DEFAULTS.branch);
+  closeSettings();
+  loadReports();
+}
+
+// ═══ Shortcut Guide ════════════════════════════════════════
+
+function showShortcutGuide() {
+  const { owner, repo } = cfg();
+  const base = `https://${owner}.github.io/${repo}/`;
+  document.getElementById('shortcut-url-display').textContent =
+    `${base}?action=ref&text=TEXT`;
+  document.getElementById('shortcut-overlay').classList.add('open');
+}
+
+// ═══ URL Param Handler (iOS Shortcut entry point) ══════════
+
+function handleUrlParams() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('action') === 'ref') {
+    const text = p.get('text');
+    if (text) {
+      document.getElementById('ref-content').value = text;
+      const urlParam = p.get('url');
+      if (urlParam) document.getElementById('ref-url').value = urlParam;
+    }
+    switchTab('ref', document.getElementById('nav-ref'));
+  }
+}
+
+// ═══ Helpers ═══════════════════════════════════════════════
+
+function showStatus(id, type, msg) {
+  const el = document.getElementById(id);
+  el.className = `status ${type} show`;
+  el.textContent = msg;
+  if (type === 'success') setTimeout(() => el.classList.remove('show'), 7000);
+}
+
+// ═══ Init ══════════════════════════════════════════════════
+
+window.addEventListener('load', () => {
+  handleUrlParams();
+  if (!cfg().token) {
+    setTimeout(openSettings, 400);
+  } else if (document.getElementById('tab-reports').classList.contains('active')) {
+    loadReports();
+  }
+});
+</script>
+</body>
+</html>
