@@ -31,4 +31,10 @@ export const SCREENSHOTS: Screenshot[] = [
         featureName: '每週營業時段彈性設定與管理',
         description: '此SaaS產品截圖為設定「每週預設時段」的介面。畫面列出週日到週六的項目，每個含一個啟用開關。已啟用（粉紅色）的週一至週四顯示可調整的預約起迄時間，例如週一為上午9點至下午6點。未啟用（灰色）的週日、週五、週六則顯示「本日公休 / 不開放預約」。使用者可透過開關啟用或禁用特定日期的預約，並調整其開放時段。',
     },
+    {
+        filename: 'img_6410.jpeg',
+        githubUrl: 'https://raw.githubusercontent.com/0rigind1865-bit/GlowPulse/main/assets/screenshots/img_6410.jpeg',
+        featureName: '預約使用清單檢視時的篩選功能',
+        description: '',
+    },
 ];
