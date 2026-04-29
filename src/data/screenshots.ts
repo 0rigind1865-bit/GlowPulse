@@ -37,4 +37,10 @@ export const SCREENSHOTS: Screenshot[] = [
         featureName: '預約使用清單檢視時的篩選功能',
         description: '',
     },
+    {
+        filename: 'img_6414.jpeg',
+        githubUrl: 'https://raw.githubusercontent.com/0rigind1865-bit/GlowPulse/main/assets/screenshots/img_6414.jpeg',
+        featureName: '月曆視覺管理',
+        description: '',
+    },
 ];
