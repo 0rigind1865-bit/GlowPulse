@@ -168,3 +168,19 @@ URL:
 文字：
 為何收錄：
 ```
+
+
+---
+
+<!-- 來源：https://www.threads.com/@verna_eyebrow_studio/post/DXvVGkCkkv6?xmt=AQF0YTgk6lqNXoz-SlbrQmOQkRKucdIkrHL54EiY871rqVr0oQZU3K2nnKPO4P_WGgQU4fol&slof=1 -->
+<!-- 新增日期：2026-04-30 -->
+
+搭好喲✨🫶
+我是一位小小兼職美甲師想認識更多美業
+IG版面非常需要漲粉被更多人看見
+
+💗💗💗IG✚脆 雙追不退追💗💗💗
+💗💗💗IG✚脆 雙追不退追💗💗💗
+💗💗💗IG✚脆 互雙追不退追💗💗💗
+
+感謝你們每一位追蹤🫶
