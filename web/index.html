@@ -215,6 +215,47 @@
     .sheet h2 { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
     .mono { font-family: 'SF Mono', Consolas, monospace; font-size: 13px !important; }
 
+    /* ── Reference Post Cards ───────────────────────────── */
+    .ref-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .ref-card-meta {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px; flex-wrap: wrap;
+    }
+    .badge {
+      font-size: 11px; font-weight: 600; padding: 2px 8px;
+      border-radius: 20px; background: rgba(245,166,35,.18); color: var(--accent);
+      white-space: nowrap;
+    }
+    .ref-date { font-size: 11px; color: var(--text-dim); }
+    .ref-content {
+      font-size: 14px; line-height: 1.6; color: var(--text);
+      white-space: pre-wrap; word-break: break-word;
+      overflow: hidden; max-height: 72px;
+      position: relative; transition: max-height 0.25s ease;
+    }
+    .ref-content.expanded { max-height: 2000px; }
+    .ref-content:not(.expanded)::after {
+      content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+      height: 32px;
+      background: linear-gradient(transparent, var(--surface));
+    }
+    .ref-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 10px;
+    }
+    .ref-link { font-size: 12px; color: var(--accent); text-decoration: none; }
+    .ref-link:hover { text-decoration: underline; }
+    .expand-btn {
+      background: none; border: none; color: var(--text-dim);
+      font-size: 12px; cursor: pointer; padding: 0; font-family: inherit;
+    }
+
     /* ── Post Type Selector ──────────────────────────────── */
     .type-grid {
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
@@ -285,7 +326,18 @@
 
   <!-- Tab: 週報 -->
   <div id="tab-reports" class="tab-panel active">
-    <div class="section-title">發文成效週報</div>
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-weight:600;font-size:15px">週報分析</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:2px">抓取本週發文數據並產生 AI 分析</div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="report-trigger-btn" onclick="triggerReport()" style="white-space:nowrap;flex-shrink:0">
+        立即產生
+      </button>
+    </div>
+    <div class="status" id="report-trigger-status"></div>
+
+    <div class="section-title" style="margin-top:4px">歷史週報</div>
     <div id="reports-list"><div class="loading">載入中…</div></div>
   </div>
 
@@ -406,6 +458,13 @@
       </button>
       <div class="status" id="ref-status"></div>
     </div>
+
+    <div class="section-title" style="margin-top:20px">參考庫統整</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <span id="ref-lib-count" style="font-size:13px;color:var(--text-dim)">尚未載入</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadRefLibrary()">載入 / 重新整理</button>
+    </div>
+    <div id="ref-library-list"></div>
 
     <div class="section-title">iOS Shortcut 快速分享</div>
     <div class="card">
@@ -782,6 +841,127 @@ async function addReferencePost() {
 
   btn.disabled = false;
   btn.textContent = '新增到參考庫';
+}
+
+// ═══ Report Trigger ════════════════════════════════════════
+
+async function triggerReport() {
+  if (!cfg().token) { openSettings(); return; }
+  const btn = document.getElementById('report-trigger-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  showStatus('report-trigger-status', '', '');
+
+  try {
+    const { token, owner, repo, branch } = cfg();
+    const r = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/actions/workflows/schedule-report.yml/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ref: branch }),
+      }
+    );
+    if (r.status === 204) {
+      showStatus('report-trigger-status', 'success',
+        '✅ 週報產生中！\n\nGitHub Actions 執行約 2–5 分鐘，完成後會自動 commit 報告到 docs/reports/。'
+      );
+    } else {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `HTTP ${r.status}`);
+    }
+  } catch (e) {
+    showStatus('report-trigger-status', 'error', `❌ 失敗：${e.message}`);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '立即產生';
+}
+
+// ═══ Reference Library ═════════════════════════════════════
+
+function parseRefPosts(markdown) {
+  const blocks = markdown.split(/\n---\n/);
+  const posts = [];
+  for (const block of blocks) {
+    const dateMatch = block.match(/<!--\s*新增日期：(.+?)\s*-->/);
+    if (!dateMatch) continue;
+    const styleMatch = block.match(/<!--\s*風格：(.+?)\s*-->/);
+    const urlMatch   = block.match(/<!--\s*來源：(.+?)\s*-->/);
+    const content    = block.replace(/<!--[\s\S]*?-->/g, '').trim();
+    if (!content) continue;
+    posts.push({
+      date:    dateMatch[1].trim(),
+      style:   styleMatch?.[1]?.trim() || '',
+      url:     urlMatch?.[1]?.trim()   || '',
+      content,
+    });
+  }
+  return posts.reverse(); // 最新在上
+}
+
+function buildRefCard(post, idx) {
+  const badge  = post.style ? `<span class="badge">${post.style}</span>` : '';
+  const urlRow = post.url
+    ? `<a class="ref-link" href="${post.url}" target="_blank">🔗 來源貼文</a>`
+    : '<span></span>';
+  const preview = post.content.slice(0, 60);
+  const needExpand = post.content.length > 60;
+  return `
+    <div class="ref-card">
+      <div class="ref-card-meta">
+        ${badge}
+        <span class="ref-date">${post.date}</span>
+      </div>
+      <div class="ref-content" id="rfc-${idx}">${escHtml(post.content)}</div>
+      <div class="ref-footer">
+        ${urlRow}
+        ${needExpand
+          ? `<button class="expand-btn" onclick="toggleRef(${idx})">展開 ▾</button>`
+          : '<span></span>'}
+      </div>
+    </div>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function toggleRef(idx) {
+  const el  = document.getElementById(`rfc-${idx}`);
+  const btn = el.parentElement.querySelector('.expand-btn');
+  const expanded = el.classList.toggle('expanded');
+  btn.textContent = expanded ? '收合 ▴' : '展開 ▾';
+}
+
+async function loadRefLibrary() {
+  const listEl  = document.getElementById('ref-library-list');
+  const countEl = document.getElementById('ref-lib-count');
+  if (!cfg().token) { openSettings(); return; }
+
+  listEl.innerHTML  = '<div class="loading">載入中…</div>';
+  countEl.textContent = '載入中…';
+
+  try {
+    const data     = await ghGet('docs/reference-posts.md');
+    const markdown = decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
+    const posts    = parseRefPosts(markdown);
+
+    countEl.textContent = `共 ${posts.length} 筆（從網頁新增的）`;
+
+    if (!posts.length) {
+      listEl.innerHTML = '<div class="empty"><div class="emoji">📭</div>尚無透過網頁新增的參考貼文</div>';
+      return;
+    }
+    listEl.innerHTML = posts.map(buildRefCard).join('');
+  } catch (e) {
+    listEl.innerHTML  = `<div class="empty"><div class="emoji">⚠️</div>${e.message}</div>`;
+    countEl.textContent = '載入失敗';
+  }
 }
 
 // ═══ Post Trigger ══════════════════════════════════════════
