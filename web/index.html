@@ -215,6 +215,49 @@
     .sheet h2 { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
     .mono { font-family: 'SF Mono', Consolas, monospace; font-size: 13px !important; }
 
+    /* ── Post Type Selector ──────────────────────────────── */
+    .type-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      margin-bottom: 14px;
+    }
+    .type-btn {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 6px; padding: 16px 8px;
+      background: var(--surface2); border: 2px solid var(--border);
+      border-radius: 12px; cursor: pointer; transition: all 0.15s;
+      font-family: inherit; color: var(--text-dim); font-size: 13px; font-weight: 500;
+    }
+    .type-btn .type-icon { font-size: 26px; }
+    .type-btn.selected {
+      border-color: var(--accent); color: var(--accent);
+      background: rgba(245,166,35,.10);
+    }
+    .type-btn:active { opacity: 0.7; }
+
+    /* ── Toggle ──────────────────────────────────────────── */
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-top: 1px solid var(--border); margin-top: 4px;
+    }
+    .toggle-label { font-size: 14px; color: var(--text-dim); }
+    .toggle {
+      position: relative; width: 51px; height: 31px;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute; inset: 0; border-radius: 31px;
+      background: var(--surface2); border: 1px solid var(--border);
+      transition: background 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: var(--accent); }
+    .toggle-thumb {
+      position: absolute; top: 3px; left: 3px;
+      width: 25px; height: 25px; border-radius: 50%;
+      background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+      transition: transform 0.2s; pointer-events: none;
+    }
+    .toggle input:checked ~ .toggle-thumb { transform: translateX(20px); }
+
     /* ── Misc ────────────────────────────────────────────── */
     .empty { text-align: center; color: var(--text-dim); padding: 48px 0; font-size: 14px; }
     .empty .emoji { font-size: 36px; margin-bottom: 8px; }
@@ -276,6 +319,60 @@
     </div>
   </div>
 
+  <!-- Tab: 立即發文 -->
+  <div id="tab-post" class="tab-panel">
+    <div class="section-title">手動發文</div>
+    <div class="card">
+      <div class="form-group">
+        <label>選擇發文類型</label>
+        <div class="type-grid">
+          <button class="type-btn selected" id="type-long" onclick="selectType('long')">
+            <span class="type-icon">📝</span>長文
+          </button>
+          <button class="type-btn" id="type-short" onclick="selectType('short')">
+            <span class="type-icon">💬</span>短文
+            <span style="font-size:10px;color:var(--text-dim)">130字</span>
+          </button>
+          <button class="type-btn" id="type-image" onclick="selectType('image')">
+            <span class="type-icon">🖼️</span>圖片
+          </button>
+        </div>
+      </div>
+
+      <!-- 圖片選項（只在 image 類型顯示） -->
+      <div id="image-options" style="display:none">
+        <div class="toggle-row">
+          <span class="toggle-label">使用最新截圖（--latest）</span>
+          <label class="toggle">
+            <input type="checkbox" id="use-latest-toggle">
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </label>
+        </div>
+      </div>
+
+      <button class="btn btn-primary mt" id="post-btn" onclick="triggerPost()">
+        🚀 立即發文
+      </button>
+      <p class="hint" style="margin-top:10px;text-align:center">
+        觸發 GitHub Actions，通常 1–2 分鐘後完成發布。<br>
+        需要 Token 具備 <code>workflow</code> 權限。
+      </p>
+      <div class="status" id="post-status"></div>
+    </div>
+
+    <div class="section-title">自動排程</div>
+    <div class="card">
+      <p style="font-size:14px;line-height:1.7;color:var(--text-dim)">
+        每天系統會自動隨機選擇一個時段（台灣 09:00 / 12:00 / 15:00 / 18:00 / 21:00 其中一個）發文，類型也會隨機決定。
+      </p>
+      <a href="https://github.com/0rigind1865-bit/GlowPulse/actions/workflows/schedule-daily-post.yml"
+         target="_blank" class="btn btn-secondary mt" style="text-decoration:none;display:flex">
+        查看發文紀錄 →
+      </a>
+    </div>
+  </div>
+
   <!-- Tab: 參考貼文 -->
   <div id="tab-ref" class="tab-panel">
     <div class="section-title">新增參考貼文</div>
@@ -331,13 +428,17 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
     週報
   </button>
+  <button id="nav-post" onclick="switchTab('post',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    發文
+  </button>
   <button id="nav-upload" onclick="switchTab('upload',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
     截圖
   </button>
   <button id="nav-ref" onclick="switchTab('ref',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-    參考貼文
+    參考
   </button>
 </nav>
 
@@ -362,7 +463,7 @@
     <div class="form-group">
       <label>GitHub Personal Access Token</label>
       <input type="password" id="s-token" class="mono" placeholder="ghp_…">
-      <p class="hint">需要 <code>repo</code> 權限。<a href="https://github.com/settings/tokens/new?scopes=repo&description=GlowPulse+Dashboard" target="_blank">點此產生 →</a></p>
+      <p class="hint">需要 <code>repo</code> + <code>workflow</code> 權限。<a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=GlowPulse+Dashboard" target="_blank">點此產生 →</a></p>
     </div>
 
     <div class="row">
@@ -681,6 +782,73 @@ async function addReferencePost() {
 
   btn.disabled = false;
   btn.textContent = '新增到參考庫';
+}
+
+// ═══ Post Trigger ══════════════════════════════════════════
+
+let _selectedType = 'long';
+
+function selectType(type) {
+  _selectedType = type;
+  ['long', 'short', 'image'].forEach(t => {
+    document.getElementById(`type-${t}`).classList.toggle('selected', t === type);
+  });
+  document.getElementById('image-options').style.display = (type === 'image') ? 'block' : 'none';
+}
+
+async function triggerPost() {
+  if (!cfg().token) { openSettings(); return; }
+
+  const btn = document.getElementById('post-btn');
+  const useLatest = document.getElementById('use-latest-toggle').checked;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>觸發中…';
+  showStatus('post-status', '', '');
+
+  const typeLabels = { long: '長文', short: '短文（130字）', image: '圖片' };
+
+  try {
+    const { token, owner, repo, branch } = cfg();
+    const r = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/actions/workflows/schedule-daily-post.yml/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ref: branch,
+          inputs: {
+            post_type: _selectedType,
+            use_latest: String(useLatest),
+          },
+        }),
+      }
+    );
+
+    if (r.status === 204) {
+      showStatus('post-status', 'success',
+        `✅ 已觸發 ${typeLabels[_selectedType]}發文！\n\n` +
+        `GitHub Actions 正在執行，約 1–2 分鐘後完成。\n` +
+        `可點下方「查看發文紀錄」確認執行狀態。`
+      );
+    } else {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `HTTP ${r.status}`);
+    }
+  } catch (e) {
+    const isScope = e.message?.includes('workflow');
+    showStatus('post-status', 'error',
+      `❌ 失敗：${e.message}` +
+      (isScope ? '\n\n💡 請確認 Token 已勾選 workflow 權限（Settings → 重新產生 Token）' : '')
+    );
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '🚀 立即發文';
 }
 
 // ═══ Settings ══════════════════════════════════════════════

@@ -17,6 +17,16 @@ on:
     - cron: '0 13 * * *'   # 台灣 21:00
   workflow_dispatch:
     inputs:
+      post_type:
+        description: '發文類型（auto = 隨機）'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - long
+          - short
+          - image
       use_latest:
         description: '圖片貼文使用最新截圖（--latest）'
         required: false
@@ -67,21 +77,34 @@ jobs:
         if: steps.gate.outputs.active == 'true' || github.event_name == 'workflow_dispatch'
         run: npm ci
 
-      - name: 隨機選擇發文類型並發布
+      - name: 選擇發文類型並發布
         if: steps.gate.outputs.active == 'true' || github.event_name == 'workflow_dispatch'
         run: |
-          TYPE=$((RANDOM % 3))
+          # 決定發文類型：手動指定優先，否則隨機
+          POST_TYPE="${{ github.event.inputs.post_type }}"
+          if [ -z "$POST_TYPE" ] || [ "$POST_TYPE" = "auto" ]; then
+            TYPE=$((RANDOM % 3))
+          elif [ "$POST_TYPE" = "long" ]; then
+            TYPE=0
+          elif [ "$POST_TYPE" = "short" ]; then
+            TYPE=1
+          elif [ "$POST_TYPE" = "image" ]; then
+            TYPE=2
+          else
+            TYPE=$((RANDOM % 3))
+          fi
+
           case $TYPE in
             0)
-              echo "📝 今日類型：長文貼文"
+              echo "📝 類型：長文貼文"
               npm run post -- --yes
               ;;
             1)
-              echo "💬 今日類型：短文貼文（130 字）"
+              echo "💬 類型：短文貼文（130 字）"
               npm run post -- --yes --max-chars 130
               ;;
             2)
-              echo "🖼️  今日類型：圖片貼文"
+              echo "🖼️  類型：圖片貼文"
               if [ "${{ github.event.inputs.use_latest }}" = "true" ]; then
                 npm run image-post -- --yes --latest
               else
