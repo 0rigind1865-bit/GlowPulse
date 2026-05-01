@@ -305,53 +305,75 @@ export async function runImagePost(maxChars?: number, useLatest = false): Promis
     console.log(`🎨 發文風格：${style.name}`);
 
     // 步驟一：視覺描述
-    // 規則：只有 featureName 與 description 皆為空，才呼叫 Gemini 並回寫 screenshots.ts
+    // 規則：
+    //   兩者皆空 → Gemini 生成 featureName + description 並回寫
+    //   兩者皆有 → 直接使用快取，不重跑 Gemini
+    //   featureName 有、description 空 → Gemini 補全 description（網頁上傳時常見）
+    //   featureName 空、description 有 → 異常，拒絕執行
     const isFeatureEmpty = !workingScreenshot.featureName.trim();
     const isDescEmpty = !workingScreenshot.description?.trim();
 
-    let visualDesc: string;
-    if (isFeatureEmpty && isDescEmpty) {
-        console.log('\n👁️  Gemini 正在分析截圖畫面（首次建立快取）...');
+    // 呼叫 Gemini 並處理常見錯誤的共用函式
+    const callGeminiForDesc = async (): Promise<string | null> => {
         try {
-            visualDesc = await describeImageWithGemini(workingScreenshot.githubUrl);
-            const generatedFeature = await generateFeatureFromDescription(visualDesc);
-            const finalFeatureName = await ensureFeatureInDataFile(generatedFeature);
-            await persistScreenshotMetadata(workingScreenshot, finalFeatureName, visualDesc);
-
-            workingScreenshot = {
-                ...workingScreenshot,
-                featureName: finalFeatureName,
-                description: visualDesc,
-            };
-            console.log('✅ 已將 featureName 與 description 回寫到 src/data/screenshots.ts');
-            console.log('✅ 已同步更新 src/data/features.ts 功能清單');
+            return await describeImageWithGemini(workingScreenshot.githubUrl);
         } catch (error: unknown) {
             if (error instanceof GeminiServiceError) {
                 if (error.code === 'QUOTA_EXCEEDED' || (error.code === 'MODEL_NOT_FOUND' && error.message.toLowerCase().includes('quota'))) {
-                    return {
+                    return Promise.reject({
                         success: false,
                         error: '⚠️ Gemini 免費配額已用盡。\n解決方案：\n1. 升級至 https://ai.google.dev 付費版本\n2. 或手動在 src/data/screenshots.ts 填入 featureName 與 description',
-                    };
+                    });
                 }
                 if (error.code === 'MODEL_NOT_FOUND') {
-                    return {
+                    return Promise.reject({
                         success: false,
                         error: '❌ Gemini 可用模型無法使用（可能 API Key 無效）。請檢查 https://ai.google.dev/',
-                    };
+                    });
                 }
             }
-            return {
+            return Promise.reject({
                 success: false,
                 error: `❌ 無法建立截圖描述快取\n${error instanceof Error ? error.message : String(error)}`,
-            };
+            });
+        }
+    };
+
+    let visualDesc: string;
+    if (isFeatureEmpty && isDescEmpty) {
+        // 全空：Gemini 生成 featureName + description
+        console.log('\n👁️  Gemini 正在分析截圖畫面（首次建立快取）...');
+        try {
+            visualDesc = await callGeminiForDesc() as string;
+            const generatedFeature = await generateFeatureFromDescription(visualDesc);
+            const finalFeatureName = await ensureFeatureInDataFile(generatedFeature);
+            await persistScreenshotMetadata(workingScreenshot, finalFeatureName, visualDesc);
+            workingScreenshot = { ...workingScreenshot, featureName: finalFeatureName, description: visualDesc };
+            console.log('✅ 已將 featureName 與 description 回寫到 src/data/screenshots.ts');
+            console.log('✅ 已同步更新 src/data/features.ts 功能清單');
+        } catch (result) {
+            return result as { success: false; error: string };
         }
     } else if (!isFeatureEmpty && !isDescEmpty) {
+        // 兩者皆有：直接使用快取
         console.log('\n📋 使用 screenshots.ts 既有描述（不重跑 Gemini）');
         visualDesc = workingScreenshot.description!.trim();
+    } else if (!isFeatureEmpty && isDescEmpty) {
+        // featureName 有、description 空：補全 description（網頁上傳後第一次發文的常見情況）
+        console.log('\n👁️  Gemini 正在補全截圖視覺描述（featureName 已知，僅補 description）...');
+        try {
+            visualDesc = await callGeminiForDesc() as string;
+            await persistScreenshotMetadata(workingScreenshot, workingScreenshot.featureName, visualDesc);
+            workingScreenshot = { ...workingScreenshot, description: visualDesc };
+            console.log('✅ 已將 description 回寫到 src/data/screenshots.ts');
+        } catch (result) {
+            return result as { success: false; error: string };
+        }
     } else {
+        // featureName 空、description 有：異常狀態
         return {
             success: false,
-            error: '❌ screenshots.ts 資料不完整：featureName 與 description 需同時有值或同時為空。',
+            error: '❌ screenshots.ts 資料異常：description 有值但 featureName 為空，請手動補上 featureName。',
         };
     }
 
