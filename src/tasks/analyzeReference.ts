@@ -30,22 +30,51 @@ type ReferencePost = {
 /**
  * 解析 reference-posts.md，提取所有真實貼文記錄
  *
- * 解析規則：
- * - `### 分類名稱` 切換當前分類
- * - `#### 編號` 開始一筆貼文記錄
- * - `URL:` 提取來源網址
- * - `文字：` 之後到 `為何收錄：` 之前是貼文原文（可跨多行）
- * - `為何收錄：` 提取收錄原因
- * - HTML 注解（<!-- -->）整塊略過（範例用途，非真實貼文）
+ * 支援兩種格式：
+ *
+ * 【舊格式】手動編輯：
+ *   ### 分類名稱
+ *   #### 編號
+ *   URL: https://...
+ *   文字：貼文原文（可多行）
+ *   為何收錄：說明亮點
+ *
+ * 【新格式】網頁介面新增（以 <!-- 新增日期 --> 為識別標記）：
+ *   ---
+ *   <!-- 風格：職人共鳴感 -->（選填）
+ *   <!-- 來源：https://... -->（選填）
+ *   <!-- 新增日期：2026-04-30 -->
+ *
+ *   貼文原文
  */
 function parseReferencePosts(markdown: string): ReferencePost[] {
-    // 移除 HTML 注解區塊與 code block（兩者都是說明用途，非真實貼文）
-    const cleaned = markdown
-        .replace(/<!--[\s\S]*?-->/g, '')    // <!-- --> 注解
-        .replace(/```[\s\S]*?```/g, '')     // ``` 程式碼區塊（如「新增格式」說明）
-        .replace(/`[^`]+`/g, '');           // 單行行內 code
-
     const posts: ReferencePost[] = [];
+
+    // ── 步驟一：提取新格式貼文（先處理，避免 comments 被後續清理掉）──
+    for (const block of markdown.split(/\n---\n/)) {
+        if (!block.match(/<!--\s*新增日期：/)) continue;    // 必須有日期標記才算新格式
+
+        const styleMatch = block.match(/<!--\s*風格：(.+?)\s*-->/);
+        const urlMatch   = block.match(/<!--\s*來源：(.+?)\s*-->/);
+
+        // 移除所有 HTML 注解，剩下的是貼文純文字
+        const text = block.replace(/<!--[\s\S]*?-->/g, '').trim();
+        if (!text) continue;
+
+        posts.push({
+            category: styleMatch?.[1]?.trim() || '未分類',
+            url:      urlMatch?.[1]?.trim()   || '',
+            text,
+            reason:   '',
+        });
+    }
+
+    // ── 步驟二：提取舊格式貼文（清掉注解後，解析 #### 結構）──
+    const cleaned = markdown
+        .replace(/<!--[\s\S]*?-->/g, '')    // 移除所有 HTML 注解（範例、舊說明等）
+        .replace(/```[\s\S]*?```/g, '')     // ``` 程式碼區塊（格式說明用）
+        .replace(/`[^`]+`/g, '');           // 行內 code
+
     let currentCategory = '';
     const lines = cleaned.split('\n');
     let i = 0;
@@ -68,7 +97,6 @@ function parseReferencePosts(markdown: string): ReferencePost[] {
             let inText = false;
             const textLines: string[] = [];
 
-            // 逐行讀取此條目的欄位，直到遇到下一個 #### / ### / --- 為止
             while (i < lines.length) {
                 const current = lines[i];
                 const trimmed = current.trim();
@@ -80,14 +108,12 @@ function parseReferencePosts(markdown: string): ReferencePost[] {
                     inText = false;
                 } else if (/^文字[：:]/.test(trimmed)) {
                     inText = true;
-                    // 若「文字：」同行後面就有內容，也一起收
                     const inline = trimmed.replace(/^文字[：:]/, '').trim();
                     if (inline) textLines.push(inline);
                 } else if (/^為何收錄[：:]/.test(trimmed)) {
                     reason = trimmed.replace(/^為何收錄[：:]/, '').trim();
                     inText = false;
                 } else if (inText) {
-                    // 保留原始縮排，維持貼文的換行節奏
                     textLines.push(current);
                 }
 
@@ -95,7 +121,6 @@ function parseReferencePosts(markdown: string): ReferencePost[] {
             }
 
             const text = textLines.join('\n').trim();
-            // 只收錄有實際內容的貼文（過濾空殼條目）
             if (text) {
                 posts.push({ category: currentCategory, url, text, reason });
             }

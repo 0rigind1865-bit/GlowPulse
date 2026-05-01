@@ -337,6 +337,17 @@
     </div>
     <div class="status" id="report-trigger-status"></div>
 
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:0">
+      <div>
+        <div style="font-weight:600;font-size:15px">學習參考貼文</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:2px">AI 分析參考庫，更新品牌技巧與風格指令</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="learn-trigger-btn" onclick="triggerLearn()" style="white-space:nowrap;flex-shrink:0">
+        立即學習
+      </button>
+    </div>
+    <div class="status" id="learn-trigger-status"></div>
+
     <div class="section-title" style="margin-top:4px">歷史週報</div>
     <div id="reports-list"><div class="loading">載入中…</div></div>
   </div>
@@ -880,6 +891,43 @@ async function triggerReport() {
 
   btn.disabled = false;
   btn.textContent = '立即產生';
+}
+
+async function triggerLearn() {
+  if (!cfg().token) { openSettings(); return; }
+  const btn = document.getElementById('learn-trigger-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  showStatus('learn-trigger-status', '', '');
+
+  try {
+    const { token, owner, repo, branch } = cfg();
+    const r = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/actions/workflows/analyze-reference.yml/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ref: branch }),
+      }
+    );
+    if (r.status === 204) {
+      showStatus('learn-trigger-status', 'success',
+        '✅ 學習任務已觸發！\n\nAI 正在分析參考庫，約 2–3 分鐘後會自動建立 PR，確認後 merge 即生效。'
+      );
+    } else {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `HTTP ${r.status}`);
+    }
+  } catch (e) {
+    showStatus('learn-trigger-status', 'error', `❌ 失敗：${e.message}`);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '立即學習';
 }
 
 // ═══ Reference Library ═════════════════════════════════════

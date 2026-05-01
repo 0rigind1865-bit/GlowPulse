@@ -1,0 +1,74 @@
+name: 從參考貼文學習發文策略
+
+# 讀取 docs/reference-posts.md，AI 提取寫作模式，更新 brand.ts / styles.ts
+# 可手動觸發（網頁介面按鈕）或每週日自動執行一次
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'    # 每週日台灣 10:00（UTC 02:00）自動跑
+  workflow_dispatch:
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: 分析參考貼文，更新發文策略
+        run: npm run learn -- --yes
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: 建立 PR（策略更新）
+        run: |
+          git config user.name  "GlowPulse Bot"
+          git config user.email "bot@glowpulse.local"
+
+          BRANCH="bot/learn-reference-$(date '+%Y-%m-%d-%H%M')"
+          git checkout -b "$BRANCH"
+          git add src/data/brand.ts src/data/styles.ts
+
+          if git diff --staged --quiet; then
+            echo "AI 未發現新技巧，跳過建立 PR。"
+            exit 0
+          fi
+
+          git commit -m "chore: 從參考貼文更新發文策略 $(date '+%Y-%m-%d')"
+          git push origin "$BRANCH"
+
+          cat > /tmp/pr_body.md << 'PREOF'
+          ## 從參考貼文學到的新策略
+
+          AI 分析了 `docs/reference-posts.md` 中的參考貼文，提出以下更新：
+
+          - `src/data/brand.ts` — 新增或更新寫作技巧
+          - `src/data/styles.ts` — 調整發文風格指令
+
+          > ⚠️ **請先在 Files changed 確認 AI 建議符合品牌方向，再 merge。**
+
+          🤖 由 GlowPulse Bot 自動建立
+          PREOF
+
+          gh pr create \
+            --title "🎓 發文策略更新 $(date '+%Y-%m-%d')" \
+            --body-file /tmp/pr_body.md \
+            --base main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
