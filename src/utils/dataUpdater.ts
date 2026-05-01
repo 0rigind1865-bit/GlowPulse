@@ -75,8 +75,9 @@ function extractExistingPrinciples(content: string): string[] {
  * - 超過 MAX_PRINCIPLES 時捨棄最舊的條目（FIFO）
  */
 function mergePrinciples(existing: string[], incoming: string[]): string[] {
-    // 取前 20 個字元、移除標點空白後作為去重 key
-    const normalize = (s: string) => s.slice(0, 20).replace(/[\s，。！？、]/g, '');
+    // 取前 10 個中文字元作為去重 key（中文資訊密度高，10 字足以辨識同一概念）
+    // 刻意不取更多，避免「開頭用數字」與「開頭用數字（說明）」被判為不同條目
+    const normalize = (s: string) => s.slice(0, 10).replace(/[\s，。！？、（）「」【】]/g, '');
     const existingKeys = new Set(existing.map(normalize));
 
     const trulyNew = incoming.filter(p => p.trim() && !existingKeys.has(normalize(p)));
