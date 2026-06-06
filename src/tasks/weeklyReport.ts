@@ -29,6 +29,11 @@ const TOP_POSTS_COUNT = 5;
 // 避免小樣本讓 AI 用不具代表性的觀察覆蓋掉多週累積的寫作技巧
 const MIN_POSTS_FOR_AI_ANALYSIS = 5;
 
+// 信號閘門：最高互動分數與中位數的差距低於此值，視為「整週互動太平、無變異」。
+// 此時讓 AI 從『高互動 vs 低互動』的對比中學習等於對噪音學習，故跳過 data 層更新。
+// 數值可調：太低會讓零星按讚也觸發學習；太高則長期不更新。預設要求至少有一篇明顯勝出。
+const MIN_ENGAGEMENT_SPREAD = 8;
+
 // 回覆意圖加權：他人回覆依內容分類給分，越接近「想預約」分數越高。
 // 重用 engage 的零樣本分類標籤，保持整套系統對「潛在客戶」的定義一致。
 const REPLY_INTENT_WEIGHTS: Record<string, number> = {
@@ -233,10 +238,21 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
     const topPosts = sorted.slice(0, Math.min(TOP_POSTS_COUNT, sorted.length));
     const lowPosts = sorted.slice(-Math.min(TOP_POSTS_COUNT, sorted.length)).reverse();
 
-    // ── 樣本數不足：跳過 AI 分析，只存純數據報告 ─────────────────────────────
-    if (insights.length < MIN_POSTS_FOR_AI_ANALYSIS) {
-        console.log(`\n⚠️  本週可分析貼文數量不足（${insights.length} 篇，AI 分析需至少 ${MIN_POSTS_FOR_AI_ANALYSIS} 篇）`);
-        console.log('   跳過 AI 分析與 data 層更新，避免小樣本造成語意漂移。');
+    // ── 信號閘門：樣本太少或互動太平，都不足以讓 AI 安全地改寫 data 層 ──────────
+    // 互動「變異」= 最高分與中位數的差距；差距太小代表沒有可歸因的差異可學。
+    const median = sorted[Math.floor(sorted.length / 2)].engagementScore;
+    const engagementSpread = sorted[0].engagementScore - median;
+    const lowSignalReason =
+        insights.length < MIN_POSTS_FOR_AI_ANALYSIS
+            ? `本週可分析貼文數量不足（${insights.length} 篇 < ${MIN_POSTS_FOR_AI_ANALYSIS} 篇）`
+            : engagementSpread < MIN_ENGAGEMENT_SPREAD
+                ? `本週互動太平、缺乏變異（最高分與中位數僅差 ${engagementSpread} 分 < ${MIN_ENGAGEMENT_SPREAD}）`
+                : null;
+
+    // 信號不足：跳過 AI 分析與 data 層更新，只存純數據報告
+    if (lowSignalReason) {
+        console.log(`\n⚠️  ${lowSignalReason}`);
+        console.log('   跳過 AI 分析與 data 層更新，避免對噪音／小樣本學習造成語意漂移。');
 
         const totalEngagement = insights.reduce((sum, p) => sum + p.engagementScore, 0);
         const avgEngagement = Math.round(totalEngagement / insights.length);
@@ -245,7 +261,7 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
         const reportLines = [
             `# GlowPulse 週報 ${weekStart}（數據快照）`,
             '',
-            '> ⚠️ 本週貼文數量不足，僅儲存數據快照，未進行 AI 分析與技巧更新。',
+            `> ⚠️ ${lowSignalReason}，僅儲存數據快照，未進行 AI 分析與技巧更新。`,
             '',
             '## 數據總覽',
             '',
