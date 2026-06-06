@@ -7,7 +7,7 @@
 import { generate } from '../services/generate.js';
 import { BRAND_CONTEXT } from '../data/brand.js';
 import { POST_STYLES } from '../data/styles.js';
-import { parseDataUpdates, stripUpdatesBlock, updateStylesTs } from '../utils/dataUpdater.js';
+import { parseDataUpdates, stripUpdatesBlock, updateStylesData } from '../utils/dataUpdater.js';
 import { confirmAction } from '../utils/confirm.js';
 
 // ─── 型別定義 ────────────────────────────────────────────────────────────────
@@ -177,10 +177,10 @@ export async function runGenStyles(): Promise<GenStylesResult> {
     try {
         // 代碼負責合併：現有風格完全不動，只附加新增條目
         const merged = [...POST_STYLES, ...genuinelyNew];
-        updateStylesTs(merged);
-        console.log(`\n✅ styles.ts 已更新，共 ${merged.length} 個風格`);
+        updateStylesData(merged);
+        console.log(`\n✅ styles.json 已更新，共 ${merged.length} 個風格`);
         return { success: true, newStylesCount: genuinelyNew.length, totalStyles: merged.length };
     } catch (e) {
-        return { success: false, error: `寫入 styles.ts 失敗：${e instanceof Error ? e.message : String(e)}` };
+        return { success: false, error: `寫入 styles.json 失敗：${e instanceof Error ? e.message : String(e)}` };
     }
 }
