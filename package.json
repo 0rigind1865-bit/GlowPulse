@@ -13,7 +13,8 @@
     "learn": "tsx src/agent.ts --analyze-reference",
     "gen-styles": "tsx src/agent.ts --gen-styles",
     "report": "tsx src/agent.ts --report",
-    "agent": "tsx src/agent.ts"
+    "agent": "tsx src/agent.ts",
+    "test": "node --import tsx --test \"src/**/*.test.ts\""
   },
   "keywords": [],
   "author": "",
