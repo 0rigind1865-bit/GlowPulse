@@ -1,7 +1,7 @@
 name: 每週成效報告
 
 # 每週一台灣時間 09:00（UTC 01:00）產生上週發文成效週報
-# AI 分析高低互動差異，自動更新 brand.ts / styles.ts，並將報告 commit 回 repo
+# AI 分析高低互動差異：報告直接進 main，brand.json / styles.json 的更新另開 PR 待人工審核
 
 on:
   schedule:
@@ -40,14 +40,9 @@ jobs:
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_TOKEN_REFRESHED_AT: ${{ secrets.THREADS_TOKEN_REFRESHED_AT }}
 
-      - name: 從品牌技巧衍生新發文風格
-        # 在週報更新 brand.ts 之後執行，確保讀到最新的技巧清單
-        # 只新增尚未涵蓋的風格，不改寫現有風格
-        run: npm run gen-styles -- --yes
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # 註：gen-styles（從品牌技巧自動衍生新風格）已移出每週自動排程。
+      # 它會讓 AI 每週自動擴充未經驗證的風格；改為需要時手動執行 `npm run gen-styles`，
+      # 風格庫的變動一律經人工。（見 docs/改進計劃.md P2-2）
 
       - name: 推送週報到 main，並為 data 層變更建立 PR
         run: |
@@ -56,13 +51,13 @@ jobs:
 
           DATE="$(date '+%Y-%m-%d')"
 
-          # data 層為已追蹤檔案，可直接用 git diff 偵測是否有改動
+          # data 層（AI 寫回的 JSON）為已追蹤檔案，可直接用 git diff 偵測是否有改動
           DATA_CHANGED=false
-          git diff --quiet -- src/data/brand.ts src/data/styles.ts || DATA_CHANGED=true
+          git diff --quiet -- src/data/brand.json src/data/styles.json || DATA_CHANGED=true
 
           # 先把 data 層變更暫存起來，讓週報能乾淨地 rebase / push 上 main
           if [ "$DATA_CHANGED" = true ]; then
-            git stash push -- src/data/brand.ts src/data/styles.ts
+            git stash push -- src/data/brand.json src/data/styles.json
           fi
 
           # ── (1) 週報純屬資訊性快照，直接 commit 進 main，網頁立即可見 ──
@@ -77,7 +72,7 @@ jobs:
             echo "✅ 週報已推送到 main，網頁即可看到最新報告。"
           fi
 
-          # ── (2) data 層（brand.ts / styles.ts）會影響日後發文，需人工審核 → 獨立開 PR ──
+          # ── (2) data 層（brand.json / styles.json）會影響日後發文，需人工審核 → 獨立開 PR ──
           if [ "$DATA_CHANGED" != true ]; then
             echo "data 層無變更，不建立 PR。"
             exit 0
@@ -89,7 +84,7 @@ jobs:
           BRANCH="bot/weekly-data-$DATE"
           git push origin --delete "$BRANCH" 2>/dev/null || true
           git checkout -b "$BRANCH"
-          git add src/data/brand.ts src/data/styles.ts
+          git add src/data/brand.json src/data/styles.json
           git commit -m "chore: 週報 data 層更新 $DATE"
           git push origin "$BRANCH"
 
@@ -100,11 +95,11 @@ jobs:
           本週報告已自動進 main（見 `docs/reports/`），網頁可直接查看。
           以下 data 層調整會影響日後發文，請確認後再 merge：
 
-          - `src/data/brand.ts` 寫作技巧（如有更新）
-          - `src/data/styles.ts` 發文風格（如有更新）
+          - `src/data/brand.json` 寫作技巧（如有更新）
+          - `src/data/styles.json` 發文風格（如有更新）
 
           > ⚠️ **請先看 Files changed tab 確認 AI 的建議符合品牌方向，再 merge。**
-          > 特別注意 styles.ts — AI 有時會改寫原有風格指令，不只新增。
+          > 特別注意 styles.json — AI 有時會改寫原有風格指令，不只新增。
 
           🤖 由 GlowPulse Bot 自動建立
           PREOF
