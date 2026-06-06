@@ -190,6 +190,7 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
             `| 發文總篇數 | ${insights.length} 篇 |`,
             `| 平均互動分數 | ${avgEngagement} |`,
             `| 最高互動分數 | ${topPost.engagementScore}（${new Date(topPost.timestamp).toLocaleDateString('zh-TW')}）|`,
+            `| 本週總回覆數 | ${insights.reduce((s, p) => s + p.replies, 0)} 則 |`,
             '',
             '## 所有貼文排名',
             '',
@@ -246,6 +247,11 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
     const avgEngagement = Math.round(totalEngagement / insights.length);
     const topPost = sorted[0];
 
+    // 意圖信號：回覆是最接近「想預約／想了解」的行為，但因 bot 自動回覆會灌進 replies，
+    // 不納入 engagementScore（見 threads.ts），改在此單獨呈現供人工判讀。
+    const totalReplies = insights.reduce((sum, p) => sum + p.replies, 0);
+    const topByReplies = [...insights].sort((a, b) => b.replies - a.replies)[0];
+
     const reportLines = [
         `# GlowPulse 週報 ${weekStart}`,
         '',
@@ -257,6 +263,7 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
         `| 發文總篇數 | ${insights.length} 篇 |`,
         `| 平均互動分數 | ${avgEngagement} |`,
         `| 最高互動分數 | ${topPost.engagementScore}（${new Date(topPost.timestamp).toLocaleDateString('zh-TW')}）|`,
+        `| 本週總回覆數 | ${totalReplies} 則 |`,
         '',
         '## 本週最佳貼文',
         '',
@@ -265,6 +272,18 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
         '```',
         '',
         `觀看 ${topPost.views} ｜ 按讚 ${topPost.likes} ｜ 回覆 ${topPost.replies} ｜ 轉發 ${topPost.reposts} ｜ 引用 ${topPost.quotes}`,
+        '',
+        '## 意圖信號（回覆）',
+        '',
+        '> 回覆是最接近「想預約／想了解」的行為，比按讚更值得關注。',
+        '> （註：此數字可能含 bot 自動回覆，研判時請以「他人提問」為準。）',
+        '',
+        totalReplies === 0
+            ? '本週沒有任何回覆——優先思考如何讓貼文引發提問（例如結尾用具體問句、直接邀請）。'
+            : `本週共收到 **${totalReplies}** 則回覆；回覆最多的貼文（${topByReplies.replies} 則）：`,
+        ...(totalReplies === 0
+            ? []
+            : ['', '```', topByReplies.text.slice(0, 200) + (topByReplies.text.length > 200 ? '…' : ''), '```']),
         '',
         '## 所有貼文排名',
         '',
