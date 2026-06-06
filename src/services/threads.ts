@@ -466,11 +466,17 @@ export type ThreadPost = {
 /**
  * 單篇貼文的互動數據（包含加權後的綜合分數）
  *
- * engagementScore 加權邏輯：likes×3 + reposts×5 + quotes×4
- * - 轉發（×5）、引用（×4）難以自行刷高，比按讚（×3）更代表真實互動品質
- * - 回覆「刻意不計入」：bot 透過 engage 自動回覆留言會灌進貼文的 replies 數，
- *   納入分數會造成自我膨脹。回覆作為「意圖信號」改在週報中單獨呈現（見 weeklyReport）。
- * - views 不計入：曝光量龐大會稀釋真實互動的比例差異
+ * engagementScore 為「兩層」設計：
+ *
+ * 1) 基礎分數（本函式計算，無需特殊權限）：likes×3 + reposts×5 + quotes×4
+ *    - 轉發（×5）、引用（×4）難以自行刷高，比按讚（×3）更代表真實互動品質
+ *    - 原始 replies「數」不直接計入：bot 自動回覆會灌進此數，且不分內容好壞
+ *    - views 不計入：曝光量龐大會稀釋真實互動的比例差異
+ *
+ * 2) 回覆意圖分數（weeklyReport 在有 threads_manage_replies 權限時加總於上）：
+ *    逐則讀取「他人」回覆（排除自己帳號），依內容意圖加權
+ *    （預約需求 > 美容抱怨 > 一般），詳見 src/tasks/weeklyReport.ts。
+ *    這部分記在 replyIntentScore，並已併入 engagementScore。
  */
 export type PostInsights = {
     postId: string;
@@ -481,7 +487,10 @@ export type PostInsights = {
     replies: number;
     reposts: number;
     quotes: number;
-    engagementScore: number;  // 綜合互動分數：likes×3 + reposts×5 + quotes×4（replies 不計入，理由見上）
+    /** 基礎互動分數（likes×3+reposts×5+quotes×4）＋ 已套用的回覆意圖分數（如有權限） */
+    engagementScore: number;
+    /** 他人回覆依內容意圖加權的分數；未取得留言權限時為 undefined。已併入 engagementScore */
+    replyIntentScore?: number;
 };
 
 // ─── 資料擷取 API ────────────────────────────────────────────────────────────
