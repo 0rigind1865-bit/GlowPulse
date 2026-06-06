@@ -37,6 +37,9 @@ jobs:
   post:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write   # 失敗時開 issue 告警
 
     steps:
       - name: 決定今日是否在此時段發文
@@ -119,3 +122,21 @@ jobs:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_TOKEN_REFRESHED_AT: ${{ secrets.THREADS_TOKEN_REFRESHED_AT }}
+
+      - name: 失敗時開 issue 告警
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="⚠️ ${{ github.workflow }} 執行失敗"
+          BODY=$(printf '%s\n\n%s' \
+            "Workflow **${{ github.workflow }}** 於 $(date -u '+%Y-%m-%d %H:%M UTC') 失敗。" \
+            "Run log：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")
+          # 同一 workflow 已有未關閉的失敗 issue 就改用留言，避免洗版
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" \
+            --json number,title -q ".[] | select(.title == \"$TITLE\") | .number" | head -n1)
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY"
+          fi

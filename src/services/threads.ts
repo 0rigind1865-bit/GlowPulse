@@ -18,6 +18,18 @@ const THREADS_TOKEN_REFRESH_URL = 'https://graph.threads.net/refresh_access_toke
 const TOKEN_MAX_AGE_DAYS = 60;
 const TOKEN_REFRESH_BUFFER_DAYS = 5;
 
+/**
+ * 權限不足錯誤（例如讀取留言需要 threads_manage_replies / threads_read_replies 進階權限）。
+ * 與一般暫時性錯誤分開，讓上層任務能明確回報「功能因缺權限無法執行」，
+ * 而不是把空結果誤判為「正常但沒有資料」。
+ */
+export class ThreadsPermissionError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ThreadsPermissionError';
+    }
+}
+
 // ─── 內部工具函式 ────────────────────────────────────────────────────────────
 
 /**
@@ -454,9 +466,17 @@ export type ThreadPost = {
 /**
  * 單篇貼文的互動數據（包含加權後的綜合分數）
  *
- * engagementScore 加權邏輯：
- * - 回覆（×4）、轉發（×5）、引用（×4）比按讚（×3）更代表真實互動品質
- * - 按讚可能是習慣性行為，回覆與轉發才代表讀者真正被打動
+ * engagementScore 為「兩層」設計：
+ *
+ * 1) 基礎分數（本函式計算，無需特殊權限）：likes×3 + reposts×5 + quotes×4
+ *    - 轉發（×5）、引用（×4）難以自行刷高，比按讚（×3）更代表真實互動品質
+ *    - 原始 replies「數」不直接計入：bot 自動回覆會灌進此數，且不分內容好壞
+ *    - views 不計入：曝光量龐大會稀釋真實互動的比例差異
+ *
+ * 2) 回覆意圖分數（weeklyReport 在有 threads_manage_replies 權限時加總於上）：
+ *    逐則讀取「他人」回覆（排除自己帳號），依內容意圖加權
+ *    （預約需求 > 美容抱怨 > 一般），詳見 src/tasks/weeklyReport.ts。
+ *    這部分記在 replyIntentScore，並已併入 engagementScore。
  */
 export type PostInsights = {
     postId: string;
@@ -467,7 +487,10 @@ export type PostInsights = {
     replies: number;
     reposts: number;
     quotes: number;
-    engagementScore: number;  // 綜合互動分數：likes×3 + replies×4 + reposts×5 + quotes×4
+    /** 基礎互動分數（likes×3+reposts×5+quotes×4）＋ 已套用的回覆意圖分數（如有權限） */
+    engagementScore: number;
+    /** 他人回覆依內容意圖加權的分數；未取得留言權限時為 undefined。已併入 engagementScore */
+    replyIntentScore?: number;
 };
 
 // ─── 資料擷取 API ────────────────────────────────────────────────────────────
@@ -687,8 +710,14 @@ export async function getPostReplies(postId: string, token: string): Promise<Thr
     const data: unknown = await res.json().catch(() => null);
 
     if (!res.ok) {
-        // 沒有讀取留言的權限時，靜默回傳空陣列（不中止整個 engage 流程）
-        console.warn(`   ⚠️  無法取得貼文 ${postId} 的留言（${res.status}），略過。`);
+        const msg = parseError(data, `取得貼文 ${postId} 留言失敗（${res.status}）`);
+        // 權限不足（缺 threads_manage_replies / threads_read_replies）時明確拋出，
+        // 不再靜默回空——否則 engage 會每天「正常」空跑，沒人知道是權限問題。
+        if (res.status === 403 || /permission|oauth/i.test(msg)) {
+            throw new ThreadsPermissionError(msg);
+        }
+        // 其他暫時性錯誤維持原本「略過此篇、不中止整體流程」的行為
+        console.warn(`   ⚠️  ${msg}，略過此篇。`);
         return [];
     }
 

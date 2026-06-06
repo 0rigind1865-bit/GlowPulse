@@ -4,7 +4,16 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { getUsableToken, fetchMyPosts, fetchPostInsights, type PostInsights } from '../services/threads.js';
+import {
+    getUsableToken,
+    fetchMyPosts,
+    fetchPostInsights,
+    getMyProfile,
+    getPostReplies,
+    ThreadsPermissionError,
+    type PostInsights,
+} from '../services/threads.js';
+import { callZeroShot } from '../services/hf.js';
 import { generate } from '../services/generate.js';
 import { BRAND_CONTEXT } from '../data/brand.js';
 import { POST_STYLES } from '../data/styles.js';
@@ -19,6 +28,49 @@ const TOP_POSTS_COUNT = 5;
 // 若本週可分析的貼文數量低於此門檻，跳過 AI 分析與 data 層更新
 // 避免小樣本讓 AI 用不具代表性的觀察覆蓋掉多週累積的寫作技巧
 const MIN_POSTS_FOR_AI_ANALYSIS = 5;
+
+// 回覆意圖加權：他人回覆依內容分類給分，越接近「想預約」分數越高。
+// 重用 engage 的零樣本分類標籤，保持整套系統對「潛在客戶」的定義一致。
+const REPLY_INTENT_WEIGHTS: Record<string, number> = {
+    '預約需求': 10,  // 直接表達想預約／想用 → 最高價值
+    '美容抱怨': 5,   // 抱怨現況 = 潛在客戶
+    '日常生活': 1,   // 一般互動
+    '商業廣告': 0,   // 廣告／洗版，不計分
+};
+const REPLY_INTENT_LABELS = Object.keys(REPLY_INTENT_WEIGHTS);
+
+/**
+ * 把「他人回覆」依內容意圖加權，併入每篇貼文的 engagementScore。
+ * - 排除自己帳號（bot／本人）的回覆，避免自我灌分
+ * - 逐則用零樣本分類判斷意圖，依 REPLY_INTENT_WEIGHTS 給分
+ *
+ * 需要 threads_manage_replies／threads_read_replies 權限；
+ * 權限不足時回傳 false 且完全不改動分數（乾淨退回基礎分數）。
+ *
+ * @returns 是否成功套用回覆評分
+ */
+async function enrichWithReplyIntent(insights: PostInsights[], token: string): Promise<boolean> {
+    const { username: myUsername } = await getMyProfile(token);
+    for (const ins of insights) {
+        let replies;
+        try {
+            replies = await getPostReplies(ins.postId, token);
+        } catch (err) {
+            // 缺權限第一篇就會丟出 → 整體略過，不留下半套分數
+            if (err instanceof ThreadsPermissionError) return false;
+            throw err;
+        }
+        const others = replies.filter(r => r.username !== myUsername);
+        let intent = 0;
+        for (const r of others) {
+            const cls = await callZeroShot(r.text, [...REPLY_INTENT_LABELS]);
+            intent += REPLY_INTENT_WEIGHTS[cls[0]?.label ?? ''] ?? 0;
+        }
+        ins.replyIntentScore = intent;
+        ins.engagementScore += intent;  // 併進分數（已排除自己帳號的回覆）
+    }
+    return true;
+}
 
 // ─── 格式化與 AI 呼叫 ────────────────────────────────────────────────────────
 
@@ -164,6 +216,19 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
         return { success: false, error: '所有貼文的互動數據取得失敗。' };
     }
 
+    // ── 回覆意圖評分：把他人回覆（排除自己帳號）依內容意圖併入分數 ──────────────
+    // 需 threads_manage_replies 權限；無權限時自動退回基礎分數。
+    let replyScoringApplied = false;
+    console.log('\n💬 評估回覆意圖（需留言讀取權限）...');
+    try {
+        replyScoringApplied = await enrichWithReplyIntent(insights, token);
+        console.log(replyScoringApplied
+            ? '   ✅ 已將他人回覆的意圖併入互動分數'
+            : '   ⏭️  尚未取得 threads_manage_replies 權限，略過回覆評分（僅用基礎互動分數）');
+    } catch (err) {
+        console.warn(`   ⚠️  回覆評分失敗，改用基礎分數：${err instanceof Error ? err.message : err}`);
+    }
+
     const sorted = [...insights].sort((a, b) => b.engagementScore - a.engagementScore);
     const topPosts = sorted.slice(0, Math.min(TOP_POSTS_COUNT, sorted.length));
     const lowPosts = sorted.slice(-Math.min(TOP_POSTS_COUNT, sorted.length)).reverse();
@@ -190,6 +255,7 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
             `| 發文總篇數 | ${insights.length} 篇 |`,
             `| 平均互動分數 | ${avgEngagement} |`,
             `| 最高互動分數 | ${topPost.engagementScore}（${new Date(topPost.timestamp).toLocaleDateString('zh-TW')}）|`,
+            `| 本週總回覆數 | ${insights.reduce((s, p) => s + p.replies, 0)} 則 |`,
             '',
             '## 所有貼文排名',
             '',
@@ -246,6 +312,13 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
     const avgEngagement = Math.round(totalEngagement / insights.length);
     const topPost = sorted[0];
 
+    // 意圖信號：回覆是最接近「想預約／想了解」的行為。
+    // 有留言權限時，他人回覆已依內容意圖加權併入 engagementScore（見 enrichWithReplyIntent）；
+    // 無權限時退回原始回覆數，僅供人工判讀。
+    const totalReplies = insights.reduce((sum, p) => sum + p.replies, 0);
+    const topByReplies = [...insights].sort((a, b) => b.replies - a.replies)[0];
+    const totalIntentScore = insights.reduce((sum, p) => sum + (p.replyIntentScore ?? 0), 0);
+
     const reportLines = [
         `# GlowPulse 週報 ${weekStart}`,
         '',
@@ -257,6 +330,7 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
         `| 發文總篇數 | ${insights.length} 篇 |`,
         `| 平均互動分數 | ${avgEngagement} |`,
         `| 最高互動分數 | ${topPost.engagementScore}（${new Date(topPost.timestamp).toLocaleDateString('zh-TW')}）|`,
+        `| 本週總回覆數 | ${totalReplies} 則 |`,
         '',
         '## 本週最佳貼文',
         '',
@@ -265,6 +339,20 @@ export async function runWeeklyReport(): Promise<WeeklyReportResult> {
         '```',
         '',
         `觀看 ${topPost.views} ｜ 按讚 ${topPost.likes} ｜ 回覆 ${topPost.replies} ｜ 轉發 ${topPost.reposts} ｜ 引用 ${topPost.quotes}`,
+        '',
+        '## 意圖信號（回覆）',
+        '',
+        '> 回覆是最接近「想預約／想了解」的行為，比按讚更值得關注。',
+        replyScoringApplied
+            ? `> 已套用回覆內容評分（排除自己帳號）：本週回覆意圖總分 **${totalIntentScore}** 分，已併入互動分數。`
+            : '> （回覆內容評分需 threads_manage_replies 權限，本週未套用；下列回覆數含 bot 自動回覆。）',
+        '',
+        totalReplies === 0
+            ? '本週沒有任何回覆——優先思考如何讓貼文引發提問（例如結尾用具體問句、直接邀請）。'
+            : `本週共收到 **${totalReplies}** 則回覆；回覆最多的貼文（${topByReplies.replies} 則）：`,
+        ...(totalReplies === 0
+            ? []
+            : ['', '```', topByReplies.text.slice(0, 200) + (topByReplies.text.length > 200 ? '…' : ''), '```']),
         '',
         '## 所有貼文排名',
         '',

@@ -14,6 +14,7 @@ import {
     waitForContainerReady,
     publishContainer,
     waitForPostReady,
+    ThreadsPermissionError,
     type ThreadsReply,
 } from '../services/threads.js';
 
@@ -86,7 +87,24 @@ export async function runEngage(scanDays = SCAN_DAYS): Promise<EngageResult> {
     for (const post of myPosts) {
         const preview = post.text.slice(0, 30).replace(/\n/g, ' ');
         process.stdout.write(`   📝 「${preview}…」 — 取得留言中...`);
-        const replies = await getPostReplies(post.id, token);
+        let replies: ThreadsReply[];
+        try {
+            replies = await getPostReplies(post.id, token);
+        } catch (err) {
+            // 缺權限時第一篇就會丟出，直接快速失敗並明確說明，
+            // 不再讓 engage 看似「正常但沒有留言」。
+            if (err instanceof ThreadsPermissionError) {
+                process.stdout.write('\n');
+                return {
+                    success: false,
+                    error:
+                        '尚未取得 threads_manage_replies（或 threads_read_replies）權限，' +
+                        'engage 無法讀取貼文留言。請先在 Meta for Developers 申請該權限，' +
+                        `核准後再啟用排程。原始錯誤：${err.message}`,
+                };
+            }
+            throw err;
+        }
         process.stdout.write(` ${replies.length} 則`);
 
         // 過濾自己的留言：跳過 bot 之前已經發出的回覆，避免無限重複回應
