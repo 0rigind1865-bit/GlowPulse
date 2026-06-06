@@ -16,10 +16,15 @@ const DATA_DIR = dirname(fileURLToPath(import.meta.url));
 
 // ─── Schema 定義 ─────────────────────────────────────────────────────────────
 
-/** 品牌資料：靜態模板（手動維護）＋ AI 累積的寫作技巧清單 */
+/** 品牌資料：靜態模板（手動維護）＋ AI 累積的寫作技巧清單 ＋ 產品連結設定 */
 export const BrandSchema = z.object({
     template: z.string().min(1),
     principles: z.array(z.string().min(1)),
+    // 產品連結與 UTM 設定。url 留空字串即停用（貼文不帶連結），方便尚未決定網址時安全運作。
+    link: z.object({
+        url: z.string(),
+        utmCampaign: z.string().min(1),
+    }),
 });
 export type Brand = z.infer<typeof BrandSchema>;
 
