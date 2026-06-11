@@ -45,6 +45,13 @@ jobs:
       - name: 決定今日是否在此時段發文
         id: gate
         run: |
+          # 手動觸發一律放行（後續步驟的 if 條件也有涵蓋，這裡避免空字串比較報錯）
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "active=true" >> $GITHUB_OUTPUT
+            echo "▶️  手動觸發，直接執行。"
+            exit 0
+          fi
+
           # 5 個可能的 UTC 小時（對應上方 cron）
           SLOTS=(1 4 7 10 13)
 
@@ -52,17 +59,21 @@ jobs:
           SEED=$(date -u +%Y%m%d | cksum | awk '{print $1}')
           IDX=$((SEED % 5))
           TODAY_SLOT=${SLOTS[$IDX]}
-          NOW=$(date -u +%-H)
+
+          # 用「觸發本次執行的 cron 表達式」判斷，而非目前時間：
+          # GitHub cron 常延遲超過一小時，若用 date 取當下小時，
+          # 延遲跨過整點就會誤判跳過，導致整天漏發
+          CRON_HOUR=$(echo "${{ github.event.schedule }}" | awk '{print $2}')
 
           TW_HOUR=$((TODAY_SLOT + 8))
           echo "today_slot=${TODAY_SLOT}" >> $GITHUB_OUTPUT
 
-          if [ "$NOW" -eq "$TODAY_SLOT" ]; then
+          if [ "$CRON_HOUR" -eq "$TODAY_SLOT" ]; then
             echo "active=true" >> $GITHUB_OUTPUT
-            echo "✅ 今日選定時段 UTC ${TODAY_SLOT}（台灣 ${TW_HOUR}:00），目前符合，繼續執行。"
+            echo "✅ 今日選定時段 UTC ${TODAY_SLOT}（台灣 ${TW_HOUR}:00），本次觸發來自該時段 cron，繼續執行。"
           else
             echo "active=false" >> $GITHUB_OUTPUT
-            echo "⏭️  今日選定時段 UTC ${TODAY_SLOT}（台灣 ${TW_HOUR}:00），目前 UTC ${NOW}，跳過此觸發。"
+            echo "⏭️  今日選定時段 UTC ${TODAY_SLOT}（台灣 ${TW_HOUR}:00），本次觸發來自 UTC ${CRON_HOUR} 的 cron，跳過。"
           fi
 
       - name: Checkout
