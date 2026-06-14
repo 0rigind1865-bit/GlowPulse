@@ -426,9 +426,22 @@
 
     <div class="section-title">自動排程</div>
     <div class="card">
-      <p style="font-size:14px;line-height:1.7;color:var(--text-dim)">
-        每天系統會自動隨機選擇一個時段（台灣 09:00 / 12:00 / 15:00 / 18:00 / 21:00 其中一個）發文，類型也會隨機決定。
+      <div class="toggle-row" style="border-top:none;padding-top:0;margin-top:0">
+        <div>
+          <div style="font-size:15px;font-weight:600;color:var(--text)">每日自動發文</div>
+          <div class="toggle-label" id="auto-post-state">載入中…</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="auto-post-toggle" onchange="toggleDailyPost()" disabled>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <p style="font-size:13px;line-height:1.7;color:var(--text-dim);margin-top:10px">
+        開啟時，每天會隨機選一個時段（台灣 09:00 / 12:00 / 15:00 / 18:00 / 21:00）自動發文。
+        關閉後排程會整天跳過，但上方「立即發文」仍可手動使用。
       </p>
+      <div class="status" id="auto-post-status"></div>
       <a href="https://github.com/0rigind1865-bit/GlowPulse/actions/workflows/schedule-daily-post.yml"
          target="_blank" class="btn btn-secondary mt" style="text-decoration:none;display:flex">
         查看發文紀錄 →
@@ -664,6 +677,7 @@ function switchTab(name, btn) {
   document.getElementById(`tab-${name}`).classList.add('active');
   btn.classList.add('active');
   if (name === 'reports') loadReports();
+  if (name === 'post') loadAutomationConfig();
 }
 
 // ═══ Reports ═══════════════════════════════════════════════
@@ -1013,6 +1027,61 @@ async function loadRefLibrary() {
   } catch (e) {
     listEl.innerHTML  = `<div class="empty"><div class="emoji">⚠️</div>${e.message}</div>`;
     countEl.textContent = '載入失敗';
+  }
+}
+
+// ═══ Automation Toggle（每日自動發文總開關）═══════════════════
+
+const AUTOMATION_PATH = 'config/automation.json';
+let _automationSha = null;   // 寫回時需要的檔案 sha
+
+function renderAutoPostState(enabled) {
+  const toggle = document.getElementById('auto-post-toggle');
+  const state  = document.getElementById('auto-post-state');
+  toggle.checked  = enabled;
+  toggle.disabled = false;
+  state.textContent = enabled ? '✅ 已開啟，排程運作中' : '⏸️ 已關閉，排程將跳過';
+}
+
+async function loadAutomationConfig() {
+  const toggle = document.getElementById('auto-post-toggle');
+  const state  = document.getElementById('auto-post-state');
+  if (!cfg().token) { state.textContent = '請先在設定中輸入 Token'; toggle.disabled = true; return; }
+
+  toggle.disabled = true;
+  state.textContent = '載入中…';
+  try {
+    const data = await ghGet(AUTOMATION_PATH);
+    _automationSha = data.sha;
+    const json = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\n/g,'')))));
+    renderAutoPostState(json.dailyPostEnabled !== false);
+  } catch (e) {
+    // 檔案不存在時視為「預設開啟」，仍允許切換（切換時會建立檔案）
+    _automationSha = null;
+    renderAutoPostState(true);
+  }
+}
+
+async function toggleDailyPost() {
+  const toggle = document.getElementById('auto-post-toggle');
+  if (!cfg().token) { openSettings(); toggle.checked = !toggle.checked; return; }
+
+  const enabled = toggle.checked;
+  toggle.disabled = true;
+  showStatus('auto-post-status', '', '');
+
+  try {
+    const body = JSON.stringify({ dailyPostEnabled: enabled }, null, 2) + '\n';
+    await ghPut(AUTOMATION_PATH, body,
+      enabled ? '開啟每日自動發文' : '關閉每日自動發文', _automationSha);
+    // 重新讀取以取得最新 sha，避免連續切換時 sha 過期
+    await loadAutomationConfig();
+    showStatus('auto-post-status', 'success',
+      enabled ? '✅ 已開啟每日自動發文' : '⏸️ 已關閉，今天起排程會跳過（手動發文仍可用）');
+  } catch (e) {
+    toggle.checked = !enabled;   // 失敗時還原開關狀態
+    toggle.disabled = false;
+    showStatus('auto-post-status', 'error', `❌ 設定失敗：${e.message}`);
   }
 }
 

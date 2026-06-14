@@ -52,6 +52,19 @@ jobs:
             exit 0
           fi
 
+          # 自動發文總開關：讀 config/automation.json，被管理介面關閉時整天跳過
+          # 用 API（非 raw CDN）讀取，避免 5 分鐘快取讓開關延遲生效；檔案不存在則預設開啟
+          ENABLED=$(curl -s \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/${{ github.repository }}/contents/config/automation.json" \
+            | jq -r 'if .dailyPostEnabled == null then true else .dailyPostEnabled end')
+          if [ "$ENABLED" = "false" ]; then
+            echo "active=false" >> $GITHUB_OUTPUT
+            echo "⏸️  自動發文已由管理介面關閉，跳過此觸發。"
+            exit 0
+          fi
+
           # 5 個可能的 UTC 小時（對應上方 cron）
           SLOTS=(1 4 7 10 13)
 
